@@ -24,6 +24,13 @@ create table if not exists public.scores (
 );
 create index if not exists scores_game_score_idx on public.scores (game_id, score);
 
+-- Newer Supabase projects don't expose new tables to the API automatically.
+-- These grants let the website reach the tables; the row-level security
+-- policies below still decide which rows each player can read or write.
+grant usage on schema public to anon, authenticated;
+grant select on public.profiles, public.scores to anon, authenticated;
+grant insert, update on public.profiles, public.scores to authenticated;
+
 alter table public.profiles enable row level security;
 alter table public.scores enable row level security;
 
