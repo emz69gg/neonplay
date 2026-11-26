@@ -88,3 +88,29 @@
   to { opacity: 0; transform: translate(-50%, -280%) scale(1.15); }
 }
 .animate-rise { animation: rise .9s ease-out both; }
+
+/* Word Guess tile animations */
+@keyframes tileflip {
+  0% { transform: rotateX(0); background: var(--pre); border-color: var(--pre-border); color: var(--pre-fg); }
+  49.9% { background: var(--pre); border-color: var(--pre-border); color: var(--pre-fg); }
+  50% { transform: rotateX(90deg); background: var(--post); border-color: var(--post); color: #fff; }
+  100% { transform: rotateX(0); background: var(--post); border-color: var(--post); color: #fff; }
+}
+@keyframes rowshake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+@keyframes tilebump { 0% { transform: scale(1); } 50% { transform: scale(1.12); } 100% { transform: scale(1); } }
+.animate-rowshake { animation: rowshake .4s ease both; }
+.animate-tilebump { animation: tilebump .12s ease-out both; }
+
+@keyframes discdrop {
+  0% { transform: translateY(var(--from)); }
+  70% { transform: translateY(0); }
+  85% { transform: translateY(-8%); }
+  100% { transform: translateY(0); }
+}
+@keyframes popup { from { transform: translateY(100%); } to { transform: translateY(0); } }
+@keyframes popdown { from { transform: translateY(0); } to { transform: translateY(100%); } }
+@keyframes aimshrink { from { transform: scale(1); } to { transform: scale(0); } }

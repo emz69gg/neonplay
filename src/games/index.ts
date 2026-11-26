@@ -14,4 +14,10 @@ export const GAME_COMPONENTS: Record<GameId, LazyExoticComponent<ComponentType<G
   clicker: lazy(() => import('./Clicker')),
   flappy: lazy(() => import('./Flappy')),
   typing: lazy(() => import('./TypingTest')),
+  bricks: lazy(() => import('./BrickBreaker')),
+  blockstack: lazy(() => import('./BlockStack')),
+  wordguess: lazy(() => import('./WordGuess')),
+  connect4: lazy(() => import('./ConnectFour')),
+  whack: lazy(() => import('./WhackAMole')),
+  aim: lazy(() => import('./AimTrainer')),
 };

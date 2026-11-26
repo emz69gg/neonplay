@@ -116,6 +116,95 @@ function Art({ id }: { id: GameId }) {
           <text x="100" y="32" textAnchor="middle" fontSize="16" fontWeight="800" fill="#fff" fontFamily="JetBrains Mono">WPM</text>
         </g>
       );
+    case 'bricks':
+      return (
+        <g>
+          {Array.from({ length: 18 }).map((_, i) => {
+            const c = ['#fda4af', '#f9a8d4', '#c4b5fd', '#93c5fd', '#67e8f9', '#fde68a'][Math.floor(i / 6) * 2 + (i % 2)] ?? '#fff';
+            return (i === 8 || i === 13) ? null : <rect key={i} x={30 + (i % 6) * 24} y={18 + Math.floor(i / 6) * 13} width="21" height="10" rx="2.5" fill={c} />;
+          })}
+          <circle cx="112" cy="82" r="5" fill="#fff" />
+          <path d="M112 82 L92 60" stroke="#fff" strokeOpacity=".5" strokeWidth="2" strokeDasharray="3 3" />
+          <rect x="84" y="104" width="44" height="7" rx="3.5" fill="#fff" />
+        </g>
+      );
+    case 'blockstack': {
+      const cells: [number, number, string][] = [
+        [0, 4, '#22d3ee'], [1, 4, '#22d3ee'], [2, 4, '#22d3ee'], [3, 4, '#22d3ee'],
+        [4, 4, '#facc15'], [5, 4, '#facc15'], [4, 3, '#facc15'], [5, 3, '#facc15'],
+        [0, 3, '#a78bfa'], [1, 3, '#a78bfa'], [2, 3, '#a78bfa'], [1, 2, '#a78bfa'],
+        [6, 4, '#4ade80'], [6, 3, '#4ade80'], [7, 3, '#4ade80'], [7, 2, '#4ade80'],
+        [3, 0, '#fb7185'], [4, 0, '#fb7185'], [4, 1, '#fb7185'], [5, 1, '#fb7185'],
+      ];
+      return (
+        <g>
+          <rect x="56" y="10" width="88" height="110" rx="6" fill="#000" opacity=".2" />
+          {cells.map(([x, y, c], i) => (
+            <rect key={i} x={60 + x * 10} y={y === 0 || y === 1 ? 24 + y * 10 : 64 + y * 10} width="9" height="9" rx="1.5" fill={c} />
+          ))}
+        </g>
+      );
+    }
+    case 'wordguess': {
+      const rows = [['W', 'O', 'R', 'D', 'S'], ['G', 'U', 'E', 'S', 'S']];
+      const col = [['#64748b', '#eab308', '#64748b', '#22c55e', '#64748b'], ['#22c55e', '#22c55e', '#22c55e', '#22c55e', '#22c55e']];
+      return (
+        <g>
+          {rows.map((r, y) =>
+            r.map((ch, x) => (
+              <g key={`${x}${y}`} transform={`translate(${42 + x * 24} ${28 + y * 38})`}>
+                <rect width="21" height="30" rx="4" fill={col[y][x]} />
+                <text x="10.5" y="21" textAnchor="middle" fontSize="15" fontWeight="800" fill="#fff" fontFamily="Inter">{ch}</text>
+              </g>
+            )),
+          )}
+        </g>
+      );
+    }
+    case 'connect4':
+      return (
+        <g>
+          <rect x="44" y="20" width="112" height="96" rx="8" fill="#1d4ed8" />
+          {Array.from({ length: 30 }).map((_, i) => {
+            const x = i % 6, y = Math.floor(i / 6);
+            const red = [[1, 4], [2, 3], [3, 2], [4, 1], [2, 4], [4, 4]].some(([a, b]) => a === x && b === y);
+            const yel = [[3, 4], [3, 3], [1, 3], [4, 3], [4, 2]].some(([a, b]) => a === x && b === y);
+            return <circle key={i} cx={56 + x * 18} cy={32 + y * 18} r="7" fill={red ? '#ef4444' : yel ? '#facc15' : '#0f172a'} opacity={red || yel ? 1 : 0.55} />;
+          })}
+          <path d="M74 104 L128 50" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeOpacity=".8" />
+        </g>
+      );
+    case 'whack':
+      return (
+        <g>
+          {[[60, 96], [100, 104], [140, 96]].map(([x, y], i) => (
+            <ellipse key={i} cx={x} cy={y} rx="20" ry="7" fill="#3f2a14" />
+          ))}
+          <g transform="translate(100 78)">
+            <ellipse cx="0" cy="10" rx="16" ry="20" fill="#a16207" />
+            <circle cx="-6" cy="2" r="3" fill="#fff" /><circle cx="6" cy="2" r="3" fill="#fff" />
+            <circle cx="-6" cy="2" r="1.5" fill="#000" /><circle cx="6" cy="2" r="1.5" fill="#000" />
+            <ellipse cx="0" cy="10" rx="5" ry="3.5" fill="#fda4af" />
+          </g>
+          <ellipse cx="100" cy="104" rx="20" ry="7" fill="#3f2a14" opacity=".6" />
+          <g transform="translate(128 34) rotate(35)">
+            <rect x="-4" y="0" width="8" height="40" rx="3" fill="#fde68a" />
+            <rect x="-16" y="-14" width="32" height="18" rx="5" fill="#ef4444" />
+          </g>
+        </g>
+      );
+    case 'aim':
+      return (
+        <g>
+          <circle cx="100" cy="64" r="34" fill="#fff" />
+          <circle cx="100" cy="64" r="26" fill="#ef4444" />
+          <circle cx="100" cy="64" r="18" fill="#fff" />
+          <circle cx="100" cy="64" r="10" fill="#ef4444" />
+          <path d="M100 18v16M100 94v16M54 64h16M130 64h16" stroke="#fff" strokeWidth="3" strokeLinecap="round" />
+          <circle cx="44" cy="30" r="7" fill="#fff" opacity=".5" />
+          <circle cx="160" cy="100" r="5" fill="#fff" opacity=".5" />
+        </g>
+      );
   }
 }
 

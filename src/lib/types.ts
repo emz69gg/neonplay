@@ -8,7 +8,13 @@ export type GameId =
   | 'minesweeper'
   | 'clicker'
   | 'flappy'
-  | 'typing';
+  | 'typing'
+  | 'bricks'
+  | 'blockstack'
+  | 'wordguess'
+  | 'connect4'
+  | 'whack'
+  | 'aim';
 
 export type Category = 'arcade' | 'puzzle' | 'skill' | 'strategy' | 'idle';
 

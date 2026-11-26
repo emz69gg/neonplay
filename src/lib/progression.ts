@@ -78,7 +78,7 @@ const hs = (d: UserData, g: GameId) => d.highScores[g];
 
 export const ACHIEVEMENTS: Achievement[] = [
   { id: 'first_game', title: 'Player One', desc: 'Finish your first game', icon: '🎮', tier: 'bronze', reward: { xp: 25, coins: 25 }, check: (d) => d.totalPlays >= 1 },
-  { id: 'explorer', title: 'Explorer', desc: 'Play all 10 games', icon: '🧭', tier: 'gold', reward: { xp: 200, coins: 200 }, check: (d) => GAMES.every((g) => (d.plays[g.id] ?? 0) > 0) },
+  { id: 'explorer', title: 'Explorer', desc: `Play all ${GAMES.length} games`, icon: '🧭', tier: 'gold', reward: { xp: 200, coins: 200 }, check: (d) => GAMES.every((g) => (d.plays[g.id] ?? 0) > 0) },
   { id: 'regular', title: 'Regular', desc: 'Finish 25 games', icon: '🔁', tier: 'silver', reward: { xp: 100, coins: 100 }, check: (d) => d.totalPlays >= 25 },
   { id: 'marathon', title: 'Marathon', desc: 'Finish 100 games', icon: '🏃', tier: 'gold', reward: { xp: 300, coins: 300 }, check: (d) => d.totalPlays >= 100 },
   { id: 'level5', title: 'Rising Star', desc: 'Reach level 5', icon: '⭐', tier: 'bronze', reward: { xp: 0, coins: 100 }, check: (d) => levelFromXp(d.xp) >= 5 },
@@ -105,6 +105,18 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'flappy30', title: 'Sky Captain', desc: 'Pass 30 pipes in Flappy Wings', icon: '🛩️', tier: 'gold', game: 'flappy', reward: { xp: 200, coins: 120 }, check: (d) => (hs(d, 'flappy') ?? 0) >= 30 },
   { id: 'typist60', title: 'Keyboard Warrior', desc: 'Type 60+ WPM', icon: '⌨️', tier: 'silver', game: 'typing', reward: { xp: 100, coins: 60 }, check: (d) => (hs(d, 'typing') ?? 0) >= 60 },
   { id: 'typist90', title: 'Speed Demon', desc: 'Type 90+ WPM', icon: '🏎️', tier: 'gold', game: 'typing', reward: { xp: 250, coins: 150 }, check: (d) => (hs(d, 'typing') ?? 0) >= 90 },
+  { id: 'bricks_l3', title: 'Wrecking Ball', desc: 'Reach level 3 in Brick Breaker', icon: '🧱', tier: 'bronze', game: 'bricks', reward: { xp: 60, coins: 40 }, check: (_d, e) => e?.game === 'bricks' && Number(e.meta?.level ?? 0) >= 3 },
+  { id: 'bricks_5k', title: 'Demolition Pro', desc: 'Score 5,000 in Brick Breaker', icon: '💥', tier: 'gold', game: 'bricks', reward: { xp: 200, coins: 120 }, check: (d) => (hs(d, 'bricks') ?? 0) >= 5000 },
+  { id: 'stack_tetra', title: 'Four at Once', desc: 'Clear 4 lines with one piece in Block Stack', icon: '🟦', tier: 'silver', game: 'blockstack', reward: { xp: 80, coins: 50 }, check: (_d, e) => e?.game === 'blockstack' && Number(e.meta?.bestClear ?? 0) >= 4 },
+  { id: 'stack_10k', title: 'Master Builder', desc: 'Score 10,000 in Block Stack', icon: '🏗️', tier: 'gold', game: 'blockstack', reward: { xp: 200, coins: 120 }, check: (d) => (hs(d, 'blockstack') ?? 0) >= 10000 },
+  { id: 'word_win', title: 'Wordsmith', desc: 'Solve a Word Guess puzzle', icon: '🔤', tier: 'bronze', game: 'wordguess', reward: { xp: 40, coins: 25 }, check: (_d, e) => e?.game === 'wordguess' && e.meta?.win === true },
+  { id: 'word_3', title: 'Word Wizard', desc: 'Solve Word Guess in 3 guesses or fewer', icon: '🧠', tier: 'gold', game: 'wordguess', reward: { xp: 150, coins: 90 }, check: (_d, e) => e?.game === 'wordguess' && e.meta?.win === true && Number(e.meta?.guesses ?? 9) <= 3 },
+  { id: 'c4_win', title: 'Four in a Row', desc: 'Beat the Medium AI in Connect Four', icon: '🔴', tier: 'bronze', game: 'connect4', reward: { xp: 50, coins: 30 }, check: (_d, e) => e?.game === 'connect4' && e.meta?.win === true && e.meta?.difficulty !== 'easy' },
+  { id: 'c4_hard', title: 'Grandmaster', desc: 'Beat the Hard AI in Connect Four', icon: '🏅', tier: 'gold', game: 'connect4', reward: { xp: 250, coins: 150 }, check: (_d, e) => e?.game === 'connect4' && e.meta?.win === true && e.meta?.difficulty === 'hard' },
+  { id: 'whack_30', title: 'Bopper', desc: 'Score 30 in Whack-a-Mole', icon: '🔨', tier: 'bronze', game: 'whack', reward: { xp: 50, coins: 30 }, check: (d) => (hs(d, 'whack') ?? 0) >= 30 },
+  { id: 'whack_combo', title: 'Combo King', desc: 'Reach a 15-hit combo in Whack-a-Mole', icon: '🔥', tier: 'silver', game: 'whack', reward: { xp: 100, coins: 60 }, check: (_d, e) => e?.game === 'whack' && Number(e.meta?.bestCombo ?? 0) >= 15 },
+  { id: 'aim_450', title: 'Sharpshooter', desc: 'Average under 450 ms in Aim Trainer (30 targets)', icon: '🎯', tier: 'silver', game: 'aim', reward: { xp: 80, coins: 50 }, check: (d) => (hs(d, 'aim') ?? 9999) < 450 },
+  { id: 'aim_acc', title: 'Laser Focus', desc: '95%+ accuracy in Aim Trainer Precision mode', icon: '🔍', tier: 'gold', game: 'aim', reward: { xp: 150, coins: 90 }, check: (_d, e) => e?.game === 'aim' && e.meta?.mode === 'precision' && Number(e.meta?.accuracy ?? 0) >= 95 && Number(e.meta?.hits ?? 0) >= 20 },
 ];
 
 /* ---------------- Daily challenges ---------------- */
@@ -155,6 +167,21 @@ const CHALLENGE_POOL: Challenge[] = [
   {
     id: 'ttt_ai', title: 'Beat or draw the AI in Tic Tac Toe', icon: '❌', game: 'tictactoe', target: 1, reward: { xp: 60, coins: 40 },
     update: (p, e) => (e.game === 'tictactoe' && e.meta?.vsAi && (e.meta.win || e.meta.draw) ? 1 : p), label: (v) => (v ? 'Done' : 'Not yet'), done: (v) => v >= 1,
+  },
+  scoreAtLeast('bricks1000', 'bricks', 1000, 'Score 1,000 in Brick Breaker', '🧱', { xp: 90, coins: 60 }),
+  scoreAtLeast('stack2000', 'blockstack', 2000, 'Score 2,000 in Block Stack', '🟦', { xp: 90, coins: 60 }),
+  {
+    id: 'word_solve', title: 'Solve a Word Guess puzzle', icon: '🔤', game: 'wordguess', target: 1, reward: { xp: 80, coins: 50 },
+    update: (p, e) => (e.game === 'wordguess' && e.meta?.win ? 1 : p), label: (v) => (v ? 'Done' : 'Not yet'), done: (v) => v >= 1,
+  },
+  {
+    id: 'c4_ai', title: 'Beat the AI in Connect Four', icon: '🔴', game: 'connect4', target: 1, reward: { xp: 80, coins: 50 },
+    update: (p, e) => (e.game === 'connect4' && e.meta?.vsAi && e.meta.win ? 1 : p), label: (v) => (v ? 'Done' : 'Not yet'), done: (v) => v >= 1,
+  },
+  scoreAtLeast('whack25', 'whack', 25, 'Score 25 in Whack-a-Mole', '🔨', { xp: 70, coins: 50 }),
+  {
+    id: 'aim500', title: 'Average under 500 ms in Aim Trainer', icon: '🎯', game: 'aim', target: 1, reward: { xp: 80, coins: 50 },
+    update: (p, e) => (e.game === 'aim' && e.meta?.mode === 'speed' && e.score < 500 ? 1 : p), label: (v) => (v ? 'Done' : 'Not yet'), done: (v) => v >= 1,
   },
 ];
 
