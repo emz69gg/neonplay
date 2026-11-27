@@ -15,7 +15,8 @@ export type GameId =
   | 'connect4'
   | 'whack'
   | 'aim'
-  | 'chess';
+  | 'chess'
+  | 'neoncity';
 
 export type Category = 'arcade' | 'puzzle' | 'skill' | 'strategy' | 'idle';
 

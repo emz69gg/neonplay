@@ -385,6 +385,42 @@ export const GAMES: GameMeta[] = [
           ? { xp: 20, coins: 8 }
           : { xp: 8, coins: 3 },
   },
+  {
+    id: 'neoncity',
+    title: 'Neon City',
+    tagline: 'An open-world neon metropolis to explore.',
+    description:
+      'A rain-soaked cyberpunk city seen from above, with a neon plaza, industrial docks, a highway loop and a glowing cyber-park. Explore on foot as a cyber-courier or jump into a hover car, a heavy truck or a neon bike. Take courier contracts and beat the clock, race the three street sprints for gold medals, and hunt down 25 hidden data shards tucked into alleys, docks and parks. Your credits, shards and race times are saved.',
+    instructions: [
+      'Walk with WASD or the arrow keys, aim with the mouse, and Shift to dash.',
+      'Press E (or click a vehicle) to get in or out. In a vehicle: W/S throttle and brake, A/D steer, Space to drift, Shift to boost.',
+      'Drive into a yellow 📦 JOB circle to take a contract, then reach the cyan drop-off before the timer runs out.',
+      'Drive through a 🏁 start gate to begin a street sprint. Hit every checkpoint for a gold, silver or bronze medal.',
+      'Data shards are hidden all over the city; they show on the minimap when you get close. M opens the city map, R puts your vehicle back on the road, Esc pauses.',
+    ],
+    controls: { desktop: 'WASD + mouse, E, Shift, Space, M', mobile: 'Virtual stick + ENTER / BOOST / DRIFT / MAP buttons' },
+    category: 'arcade',
+    tags: ['open world', 'driving', 'racing', 'exploration', 'cyberpunk', 'courier'],
+    scoreLabel: 'Credits earned',
+    unit: '¢',
+    addedAt: '2026-11-28',
+    gradient: ['#db2777', '#0e7490'],
+    fullscreen: true,
+    reward: (_s, m) =>
+      m?.activity === 'race'
+        ? m.medal === 'gold'
+          ? { xp: 90, coins: 45 }
+          : m.medal === 'silver'
+            ? { xp: 60, coins: 30 }
+            : m.medal === 'bronze'
+              ? { xp: 40, coins: 18 }
+              : { xp: 20, coins: 8 }
+        : m?.activity === 'delivery'
+          ? m.win
+            ? { xp: 35, coins: 18 }
+            : { xp: 12, coins: 5 }
+          : { xp: 5, coins: 2 },
+  },
 ];
 
 export const GAME_MAP = Object.fromEntries(GAMES.map((g) => [g.id, g])) as Record<GameId, GameMeta>;

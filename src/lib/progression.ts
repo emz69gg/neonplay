@@ -97,6 +97,10 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'chess_hard', title: 'Grandmaster Slayer', desc: 'Beat the Expert (1800) or Master (2100) chess bot', icon: '👑', tier: 'gold', game: 'chess', reward: { xp: 400, coins: 250 }, check: (_d, e) => e?.game === 'chess' && e.meta?.vsAi === true && e.meta?.win === true && e.meta?.difficulty === 'hard' },
   { id: 'chess_quick', title: 'Blitz', desc: 'Checkmate a chess bot in 25 moves or fewer', icon: '⚡', tier: 'silver', game: 'chess', reward: { xp: 80, coins: 50 }, check: (_d, e) => e?.game === 'chess' && e.meta?.vsAi === true && e.meta?.win === true && e.meta?.reason === 'checkmate' && Number(e.meta?.moves ?? 99) <= 25 },
   { id: 'chess_online', title: 'Worthy Opponent', desc: 'Win an online chess game against a real player', icon: '🌐', tier: 'gold', game: 'chess', reward: { xp: 200, coins: 120 }, check: (_d, e) => e?.game === 'chess' && e.meta?.online === true && e.meta?.win === true },
+  { id: 'city_first', title: 'First Run', desc: 'Complete a courier delivery in Neon City', icon: '📦', tier: 'bronze', game: 'neoncity', reward: { xp: 50, coins: 40 }, check: (_d, e) => e?.game === 'neoncity' && e.meta?.activity === 'delivery' },
+  { id: 'city_courier', title: 'Courier of the Month', desc: 'Complete 15 deliveries in Neon City', icon: '🚚', tier: 'silver', game: 'neoncity', reward: { xp: 150, coins: 120 }, check: (_d, e) => e?.game === 'neoncity' && Number(e.meta?.deliveries ?? 0) >= 15 },
+  { id: 'city_gold', title: 'Street King', desc: 'Win a gold medal in a Neon City street sprint', icon: '🏁', tier: 'gold', game: 'neoncity', reward: { xp: 200, coins: 150 }, check: (_d, e) => e?.game === 'neoncity' && e.meta?.medal === 'gold' },
+  { id: 'city_shards', title: 'Data Hoarder', desc: 'Find all 25 data shards in Neon City', icon: '💠', tier: 'gold', game: 'neoncity', reward: { xp: 400, coins: 300 }, check: (d) => ((d.saves.neoncity as { shards?: number[] } | undefined)?.shards?.length ?? 0) >= 25 },
   { id: 'aim_450', title: 'Sharpshooter', desc: 'Average under 450 ms in Aim Trainer (30 targets)', icon: '🎯', tier: 'silver', game: 'aim', reward: { xp: 80, coins: 50 }, check: (d) => (hs(d, 'aim') ?? 9999) < 450 },
   { id: 'aim_acc', title: 'Laser Focus', desc: '95%+ accuracy in Aim Trainer Precision mode', icon: '🔍', tier: 'gold', game: 'aim', reward: { xp: 150, coins: 90 }, check: (_d, e) => e?.game === 'aim' && e.meta?.mode === 'precision' && Number(e.meta?.accuracy ?? 0) >= 95 && Number(e.meta?.hits ?? 0) >= 20 },
 ];
@@ -165,6 +169,10 @@ const CHALLENGE_POOL: Challenge[] = [
     update: (p, e) => (e.game === 'chess' && e.meta?.vsAi && e.meta.win ? 1 : p), label: (v) => (v ? 'Done' : 'Not yet'), done: (v) => v >= 1,
   },
   scoreAtLeast('whack25', 'whack', 25, 'Score 25 in Whack-a-Mole', '🔨', { xp: 70, coins: 50 }),
+  {
+    id: 'city_deliver', title: 'Complete 2 deliveries in Neon City', icon: '📦', game: 'neoncity', target: 2, reward: { xp: 90, coins: 150 },
+    update: (p, e) => (e.game === 'neoncity' && e.meta?.activity === 'delivery' ? p + 1 : p), label: (v) => `${v} / 2`, done: (v) => v >= 2,
+  },
   {
     id: 'aim500', title: 'Average under 500 ms in Aim Trainer', icon: '🎯', game: 'aim', target: 1, reward: { xp: 80, coins: 125 },
     update: (p, e) => (e.game === 'aim' && e.meta?.mode === 'speed' && e.score < 500 ? 1 : p), label: (v) => (v ? 'Done' : 'Not yet'), done: (v) => v >= 1,

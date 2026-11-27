@@ -130,6 +130,37 @@ function Art({ id }: { id: GameId }) {
           </g>
         </g>
       );
+    case 'neoncity':
+      return (
+        <g>
+          <rect x="0" y="0" width="200" height="128" fill="#0b0716" opacity=".55" />
+          {/* roads */}
+          <rect x="0" y="56" width="200" height="22" fill="#14121f" />
+          <rect x="88" y="0" width="22" height="128" fill="#14121f" />
+          <path d="M0 67 H200 M99 0 V128" stroke="#facc15" strokeOpacity=".7" strokeWidth="1.5" strokeDasharray="7 6" />
+          {/* buildings with neon trims */}
+          {([
+            [8, 6, 34, 40, '#f0abfc'], [48, 10, 30, 36, '#22d3ee'], [122, 4, 32, 42, '#a855f7'], [160, 12, 32, 34, '#fbbf24'],
+            [10, 88, 36, 34, '#22d3ee'], [52, 86, 28, 36, '#f472b6'], [120, 86, 40, 34, '#34d399'], [166, 90, 28, 30, '#f0abfc'],
+          ] as [number, number, number, number, string][]).map(([x, y, w, h, c], i) => (
+            <g key={i}>
+              <rect x={x + 3} y={y + 4} width={w} height={h} fill="#000" opacity=".45" />
+              <rect x={x} y={y} width={w} height={h} rx="2" fill="#1b1433" stroke={c} strokeWidth="1.5" />
+              <rect x={x + 5} y={y + 5} width={w / 3} height={h / 4} fill="#0d0b17" />
+            </g>
+          ))}
+          <text x="139" y="30" textAnchor="middle" fontSize="9" fontWeight="900" fill="#f472b6" style={{ filter: 'drop-shadow(0 0 3px #f472b6)' }}>NEON</text>
+          {/* car with headlights */}
+          <path d="M128 62 L176 54 L176 80 Z" fill="#e0f2fe" opacity=".25" />
+          <rect x="104" y="61" width="26" height="13" rx="4" fill="#22d3ee" />
+          <rect x="116" y="63.5" width="8" height="8" rx="2" fill="#0e7490" />
+          <ellipse cx="117" cy="67.5" rx="18" ry="11" fill="#22d3ee" opacity=".2" />
+          {/* data shard */}
+          <path d="M66 70 l5 -8 l5 8 l-5 8 z" fill="#a5f3fc" stroke="#ecfeff" strokeWidth="1" style={{ filter: 'drop-shadow(0 0 4px #67e8f9)' }} />
+          {/* rain */}
+          <path d="M20 10 l-3 9 M60 50 l-3 9 M150 60 l-3 9 M180 40 l-3 9 M30 100 l-3 9 M140 110 l-3 9 M95 30 l-3 9" stroke="#c7d2fe" strokeOpacity=".5" strokeWidth="1" />
+        </g>
+      );
     case 'bricks':
       return (
         <g>
