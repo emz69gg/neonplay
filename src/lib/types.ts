@@ -14,7 +14,8 @@ export type GameId =
   | 'wordguess'
   | 'connect4'
   | 'whack'
-  | 'aim';
+  | 'aim'
+  | 'chess';
 
 export type Category = 'arcade' | 'puzzle' | 'skill' | 'strategy' | 'idle';
 

@@ -15,7 +15,7 @@ create index if not exists profiles_xp_idx on public.profiles (xp desc);
 -- Best score per user per game (powers the global leaderboards).
 create table if not exists public.scores (
   user_id uuid not null references auth.users (id) on delete cascade,
-  game_id text not null constraint scores_game_id_check check (game_id in ('reaction','2048','snake','tictactoe','rps','memory','minesweeper','clicker','flappy','typing','bricks','blockstack','wordguess','connect4','whack','aim')),
+  game_id text not null constraint scores_game_id_check check (game_id ~ '^[a-z0-9]{2,20}$'),
   score double precision not null check (score >= 0),
   username text not null,
   avatar jsonb,

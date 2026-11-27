@@ -11,7 +11,7 @@ import { useStore } from '../store/AppStore';
 
 const FEATURED: GameId[] = ['2048', 'snake', 'flappy', 'minesweeper'];
 // Editorial popularity weights, blended with how often games are played on this profile.
-const POPULARITY: Record<GameId, number> = { snake: 10, '2048': 9, flappy: 9, typing: 8, minesweeper: 7, reaction: 7, memory: 6, clicker: 6, tictactoe: 5, rps: 4, bricks: 8, blockstack: 9, wordguess: 8, connect4: 6, whack: 6, aim: 7 };
+const POPULARITY: Record<GameId, number> = { snake: 10, '2048': 9, flappy: 9, typing: 8, minesweeper: 7, reaction: 7, memory: 6, clicker: 6, tictactoe: 5, rps: 4, bricks: 8, blockstack: 9, wordguess: 8, connect4: 6, whack: 6, aim: 7, chess: 9 };
 
 function Hero() {
   const daily = dailyFeaturedGame();

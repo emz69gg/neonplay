@@ -115,6 +115,9 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'c4_hard', title: 'Grandmaster', desc: 'Beat the Hard AI in Connect Four', icon: '🏅', tier: 'gold', game: 'connect4', reward: { xp: 250, coins: 150 }, check: (_d, e) => e?.game === 'connect4' && e.meta?.win === true && e.meta?.difficulty === 'hard' },
   { id: 'whack_30', title: 'Bopper', desc: 'Score 30 in Whack-a-Mole', icon: '🔨', tier: 'bronze', game: 'whack', reward: { xp: 50, coins: 30 }, check: (d) => (hs(d, 'whack') ?? 0) >= 30 },
   { id: 'whack_combo', title: 'Combo King', desc: 'Reach a 15-hit combo in Whack-a-Mole', icon: '🔥', tier: 'silver', game: 'whack', reward: { xp: 100, coins: 60 }, check: (_d, e) => e?.game === 'whack' && Number(e.meta?.bestCombo ?? 0) >= 15 },
+  { id: 'chess_win', title: 'Checkmate!', desc: 'Beat the Medium chess AI', icon: '♞', tier: 'silver', game: 'chess', reward: { xp: 100, coins: 60 }, check: (_d, e) => e?.game === 'chess' && e.meta?.win === true && e.meta?.difficulty !== 'easy' },
+  { id: 'chess_hard', title: 'Grandmaster Slayer', desc: 'Beat the Hard chess AI', icon: '👑', tier: 'gold', game: 'chess', reward: { xp: 400, coins: 250 }, check: (_d, e) => e?.game === 'chess' && e.meta?.win === true && e.meta?.difficulty === 'hard' },
+  { id: 'chess_quick', title: 'Blitz', desc: 'Checkmate the chess AI in 25 moves or fewer', icon: '⚡', tier: 'silver', game: 'chess', reward: { xp: 80, coins: 50 }, check: (_d, e) => e?.game === 'chess' && e.meta?.win === true && e.meta?.reason === 'checkmate' && Number(e.meta?.moves ?? 99) <= 25 },
   { id: 'aim_450', title: 'Sharpshooter', desc: 'Average under 450 ms in Aim Trainer (30 targets)', icon: '🎯', tier: 'silver', game: 'aim', reward: { xp: 80, coins: 50 }, check: (d) => (hs(d, 'aim') ?? 9999) < 450 },
   { id: 'aim_acc', title: 'Laser Focus', desc: '95%+ accuracy in Aim Trainer Precision mode', icon: '🔍', tier: 'gold', game: 'aim', reward: { xp: 150, coins: 90 }, check: (_d, e) => e?.game === 'aim' && e.meta?.mode === 'precision' && Number(e.meta?.accuracy ?? 0) >= 95 && Number(e.meta?.hits ?? 0) >= 20 },
 ];
@@ -177,6 +180,10 @@ const CHALLENGE_POOL: Challenge[] = [
   {
     id: 'c4_ai', title: 'Beat the AI in Connect Four', icon: '🔴', game: 'connect4', target: 1, reward: { xp: 80, coins: 50 },
     update: (p, e) => (e.game === 'connect4' && e.meta?.vsAi && e.meta.win ? 1 : p), label: (v) => (v ? 'Done' : 'Not yet'), done: (v) => v >= 1,
+  },
+  {
+    id: 'chess_ai', title: 'Win a game of chess vs the AI', icon: '♞', game: 'chess', target: 1, reward: { xp: 90, coins: 60 },
+    update: (p, e) => (e.game === 'chess' && e.meta?.vsAi && e.meta.win ? 1 : p), label: (v) => (v ? 'Done' : 'Not yet'), done: (v) => v >= 1,
   },
   scoreAtLeast('whack25', 'whack', 25, 'Score 25 in Whack-a-Mole', '🔨', { xp: 70, coins: 50 }),
   {

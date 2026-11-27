@@ -20,4 +20,5 @@ export const GAME_COMPONENTS: Record<GameId, LazyExoticComponent<ComponentType<G
   connect4: lazy(() => import('./ConnectFour')),
   whack: lazy(() => import('./WhackAMole')),
   aim: lazy(() => import('./AimTrainer')),
+  chess: lazy(() => import('./Chess')),
 };

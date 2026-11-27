@@ -116,6 +116,20 @@ function Art({ id }: { id: GameId }) {
           <text x="100" y="32" textAnchor="middle" fontSize="16" fontWeight="800" fill="#fff" fontFamily="JetBrains Mono">WPM</text>
         </g>
       );
+    case 'chess':
+      return (
+        <g>
+          {Array.from({ length: 16 }).map((_, i) => (
+            <rect key={i} x={68 + (i % 4) * 16} y={36 + Math.floor(i / 4) * 16} width="16" height="16" fill={(i + Math.floor(i / 4)) % 2 ? '#8b7bc8' : '#ece8fb'} opacity=".9" />
+          ))}
+          <g transform="translate(58 26)" fill="#fff" stroke="#1e1b4b" strokeWidth="2.5" strokeLinejoin="round">
+            <path d="M8 74 h34 v-8 h-4 l-3 -22 h4 v-6 h-6 v-6 h4 v-6 h-6 v-6 h-6 v6 h-6 v6 h4 v6 h-6 v6 h4 l-3 22 h-4z" />
+          </g>
+          <g transform="translate(104 30)" fill="#1e1b4b" stroke="#fff" strokeWidth="2.5" strokeLinejoin="round">
+            <path d="M6 70 h34 v-8 h-4 c0 -14 2 -22 -2 -30 c-4 -8 -14 -14 -24 -12 l2 6 c-6 2 -10 8 -8 14 l6 2 c2 -4 6 -6 10 -6 c-2 8 -8 14 -10 26 h-4z" />
+          </g>
+        </g>
+      );
     case 'bricks':
       return (
         <g>
