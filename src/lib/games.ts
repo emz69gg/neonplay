@@ -357,22 +357,28 @@ export const GAMES: GameMeta[] = [
     title: 'Chess',
     tagline: 'The ultimate strategy game.',
     description:
-      'Classic chess with every rule: castling, en passant, pawn promotion, check, checkmate, stalemate and draws. Play a friend on the same device, or challenge the computer on Easy, Medium or Hard. Your game is saved, so you can come back and finish it later. Your best win streak against the AI is your score.',
+      'Classic chess with every rule: castling, en passant, pawn promotion, check, checkmate, stalemate and draws. Play real people online — quick match or send a friend an invite link — with chess clocks, or play a friend on the same device, or challenge the computer on Easy, Medium or Hard. Your game is saved, so you can come back and finish it later. Your best win streak against the AI is your score.',
     instructions: [
-      'Choose vs AI (Easy / Medium / Hard, as White or Black) or vs Friend.',
+      'Choose vs AI (Easy / Medium / Hard), a friend on the same device, or 🌐 Online against real players.',
       'Click or tap a piece to see its legal moves, then click a highlighted square — or drag the piece.',
       'Checkmate the enemy king to win. Pawns that reach the last rank promote.',
       'Use Undo to take a move back, or Resign to give up the game.',
     ],
     controls: { desktop: 'Click or drag pieces', mobile: 'Tap a piece, then tap a square' },
     category: 'strategy',
-    tags: ['classic', 'ai', '2 players', 'board'],
+    tags: ['classic', 'ai', '2 players', 'board', 'online', 'multiplayer'],
     scoreLabel: 'Win streak',
     addedAt: '2026-11-27',
     gradient: ['#7c3aed', '#1e1b4b'],
     fullscreen: true,
     reward: (_s, m) =>
-      m?.win
+      m?.online
+        ? m.win
+          ? { xp: 120, coins: 50 }
+          : m.draw
+            ? { xp: 40, coins: 15 }
+            : { xp: 15, coins: 5 }
+        : m?.win
         ? { xp: m.difficulty === 'hard' ? 150 : m.difficulty === 'medium' ? 70 : 30, coins: m.difficulty === 'hard' ? 60 : m.difficulty === 'medium' ? 30 : 12 }
         : m?.draw && m.vsAi
           ? { xp: 20, coins: 8 }

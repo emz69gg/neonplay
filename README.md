@@ -26,6 +26,10 @@ If email confirmation is turned on in Supabase Auth, new players see a "check yo
 
 > Scores are submitted by the client. Row-level security makes sure players can only write their own rows, but it can't stop cheated scores. For competitive play, validate scores in an Edge Function.
 
+## Online chess
+
+Online 1v1 chess needs `supabase/migrations/004_online_chess.sql` (run it once in the Supabase SQL Editor). Players must be logged in. Every move goes through security-definer functions that check turn order and run the chess clocks on the server; clients validate the moves they receive. For local testing without a server, set `localStorage['neonplay:mockOnline'] = '1'` in a dev build and open two tabs.
+
 ## Project structure
 
 ```
@@ -44,7 +48,7 @@ supabase/schema.sql
 3. Register it in `src/games/index.ts` and add cover art in `components/GameThumb.tsx`.
 
 ## Features
-- **Games:** Reaction Test, 2048 (auto-saves), Snake, Tic Tac Toe (vs friend or minimax AI), Rock Paper Scissors, Memory Cards, Minesweeper (safe first click, chording, long-press flags), Clicker Simulator (saved, with offline earnings), Flappy Wings, Typing Speed Test, Brick Breaker, Block Stack, Word Guess (daily + unlimited), Connect Four (alpha-beta AI), Whack-a-Mole, Aim Trainer, Chess (full rules, AI in a web worker).
+- **Games:** Reaction Test, 2048 (auto-saves), Snake, Tic Tac Toe (vs friend or minimax AI), Rock Paper Scissors, Memory Cards, Minesweeper (safe first click, chording, long-press flags), Clicker Simulator (saved, with offline earnings), Flappy Wings, Typing Speed Test, Brick Breaker, Block Stack, Word Guess (daily + unlimited), Connect Four (alpha-beta AI), Whack-a-Mole, Aim Trainer, Chess (full rules, AI in a web worker, and online 1v1 against real players with matchmaking, invite links and server-side clocks).
 - **Every game page has:** live score, personal best, restart, fullscreen (with a fallback for iOS), description, instructions, controls, achievements, top players, and related games.
 - **Mobile:** swipe controls (2048, Snake), D-pad, tap-to-flap, long-press to flag, and a bottom navigation bar.
 - **Progression:** XP and levels, coins (spent in the avatar studio), 43 achievements, a 7-day login streak, 3 daily challenges, favorites, and recently played.
