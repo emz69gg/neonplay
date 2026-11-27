@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import {
+  cloneState,
   colorOf,
   fromFen,
   legalMoves,
@@ -53,6 +54,7 @@ export function replay(moves: PlainMove[]) {
   const sans: string[] = [];
   const keys: string[] = [positionKey(state)];
   const applied: Move[] = [];
+  const positions: State[] = [cloneState(state)];
   let valid = true;
   for (const pm of moves) {
     const m = legalMoves(state).find((x) => x.from === pm.from && x.to === pm.to && (x.promo ?? undefined) === (pm.promo ?? undefined));
@@ -64,8 +66,9 @@ export function replay(moves: PlainMove[]) {
     make(state, m);
     applied.push(m);
     keys.push(positionKey(state));
+    positions.push(cloneState(state));
   }
-  return { state, sans, keys, applied, valid };
+  return { state, sans, keys, applied, positions, valid };
 }
 
 export function material(state: State) {
@@ -117,11 +120,26 @@ export function PlayerBar({
   );
 }
 
-export function MoveList({ sans, emptyText }: { sans: string[]; emptyText: string }) {
+export function MoveList({ sans, emptyText, viewing, onSelect }: { sans: string[]; emptyText: string; viewing?: number | null; onSelect?: (ply: number) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    ref.current?.scrollTo({ top: ref.current.scrollHeight });
-  }, [sans.length]);
+    if (viewing == null) ref.current?.scrollTo({ top: ref.current.scrollHeight });
+  }, [sans.length, viewing]);
+  const current = viewing ?? sans.length; // ply shown on the board
+  const cell = (ply: number) => {
+    const san = sans[ply - 1];
+    if (!san) return <span />;
+    const on = ply === current;
+    return (
+      <button
+        type="button"
+        onClick={() => onSelect?.(ply)}
+        className={`rounded px-1 text-left transition hover:bg-surface2 ${on ? 'bg-neon-purple/20 font-bold text-neon-purple' : ''}`}
+      >
+        {san}
+      </button>
+    );
+  };
   return (
     <div className="card flex min-h-[140px] flex-1 flex-col p-4">
       <div className="mb-2 text-xs font-bold uppercase tracking-wider text-muted">Moves</div>
@@ -132,14 +150,54 @@ export function MoveList({ sans, emptyText }: { sans: string[]; emptyText: strin
           <ol className="grid grid-cols-[2.5rem_1fr_1fr] gap-x-2 gap-y-0.5" aria-label="Move list">
             {Array.from({ length: Math.ceil(sans.length / 2) }, (_, i) => (
               <li key={i} className="contents">
-                <span className="text-muted">{i + 1}.</span>
-                <span className={i * 2 === sans.length - 1 ? 'font-bold text-neon-purple' : ''}>{sans[i * 2]}</span>
-                <span className={i * 2 + 1 === sans.length - 1 ? 'font-bold text-neon-purple' : ''}>{sans[i * 2 + 1] ?? ''}</span>
+                <span className="py-0.5 text-muted">{i + 1}.</span>
+                {cell(i * 2 + 1)}
+                {cell(i * 2 + 2)}
               </li>
             ))}
           </ol>
         )}
       </div>
+    </div>
+  );
+}
+
+function slideStyle(m: Move, flipped: boolean): CSSProperties {
+  const col = (sq: number) => (flipped ? 7 - (sq & 7) : sq & 7);
+  const row = (sq: number) => (flipped ? 7 - (sq >> 3) : sq >> 3);
+  return {
+    ['--dx' as string]: `${(col(m.from) - col(m.to)) * 100}%`,
+    ['--dy' as string]: `${(row(m.from) - row(m.to)) * 100}%`,
+    animation: 'pieceslide .18s ease-out both',
+  };
+}
+
+/** ⏮ ◀ ▶ ⏭ controls for reviewing earlier positions. view = ply shown, or null for the live position. */
+export function BoardNav({ total, view, setView }: { total: number; view: number | null; setView: (v: number | null) => void }) {
+  const cur = view ?? total;
+  const go = (v: number) => setView(v >= total ? null : Math.max(0, v));
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return;
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        go(cur - 1);
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        go(cur + 1);
+      }
+    };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  });
+  const btn = 'btn-ghost h-9 flex-1 !p-0 text-base';
+  return (
+    <div className="flex items-center gap-1.5">
+      <button className={btn} onClick={() => go(0)} disabled={cur === 0} aria-label="First move">⏮</button>
+      <button className={btn} onClick={() => go(cur - 1)} disabled={cur === 0} aria-label="Previous move">◀</button>
+      <button className={btn} onClick={() => go(cur + 1)} disabled={view === null} aria-label="Next move">▶</button>
+      <button className={btn} onClick={() => setView(null)} disabled={view === null} aria-label="Latest position">⏭</button>
     </div>
   );
 }
@@ -154,7 +212,9 @@ export function ChessBoard({
   checkSq,
   onMove,
   onSound,
+  animKey,
 }: {
+  animKey?: string | number;
   state: State;
   legal: Move[];
   interactive: boolean;
@@ -264,7 +324,11 @@ export function ChessBoard({
                 {f === cols[0] && <span className={`absolute left-0.5 top-0 text-[9px] font-bold sm:text-[11px] ${light ? 'text-[#8b7bc8]' : 'text-[#ece8fb]'}`}>{8 - r}</span>}
                 {r === rows[7] && <span className={`absolute bottom-0 right-1 text-[9px] font-bold sm:text-[11px] ${light ? 'text-[#8b7bc8]' : 'text-[#ece8fb]'}`}>{'abcdefgh'[f]}</span>}
                 {p && (
-                  <span className={`relative grid h-full w-full place-items-center text-[clamp(26px,9.5vw,58px)] ${dragging ? 'opacity-30' : ''}`}>
+                  <span
+                    key={last && last.to === sq ? `slide-${animKey}` : 'still'}
+                    className={`relative grid h-full w-full place-items-center text-[clamp(26px,9.5vw,58px)] ${last && last.to === sq ? 'z-[2]' : 'z-[1]'} ${dragging ? 'opacity-30' : ''}`}
+                    style={last && last.to === sq && !dragMoved ? slideStyle(last, flipped) : undefined}
+                  >
                     <Piece p={p as PieceChar} size="1em" />
                   </span>
                 )}

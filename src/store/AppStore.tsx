@@ -44,6 +44,9 @@ export interface FinishResult {
 }
 
 interface Store {
+  recoveryOpen: boolean;
+  setRecoveryOpen: (o: boolean) => void;
+  syncError: boolean;
   ready: boolean;
   user: AuthUser | null;
   data: UserData;
@@ -117,6 +120,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [syncing, setSyncing] = useState(false);
   const [authOpen, openAuth] = useState<null | 'login' | 'register'>(null);
   const [settingsOpen, openSettings] = useState(false);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [syncError, setSyncError] = useState(false);
 
   const dataRef = useRef(data);
   const userRef = useRef(user);
@@ -162,7 +167,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       cloudTimer.current = window.setTimeout(async () => {
         setSyncing(true);
         try {
-          await backend.pushCloudData(user, dataRef.current);
+          const ok = await backend.pushCloudData(user, dataRef.current);
+          setSyncError(!ok);
+        } catch {
+          setSyncError(true);
         } finally {
           setSyncing(false);
         }
@@ -172,20 +180,23 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 
   /* ---- load an account's data ---- */
   const enterAccount = useCallback(
-    async (u: AuthUser, opts: { isNew?: boolean; mergeGuest?: boolean } = {}) => {
+    async (uIn: AuthUser, opts: { isNew?: boolean; mergeGuest?: boolean } = {}) => {
+      let u = uIn;
       const guest = backend.loadGuest();
-      let d: UserData | undefined = (await backend.fetchCloudData(u)) ?? backend.loadCached(u.id, u.username);
-      if (!d) {
-        // brand-new account: carry over guest progress
-        d = opts.isNew && guest.totalPlays > 0 ? { ...guest, username: u.username } : newUserData(u.username);
-        d.username = u.username;
-      } else if (opts.mergeGuest && guest.totalPlays > 0) {
-        d = mergeProgress(d, guest);
+      const cloud = await backend.fetchCloudData(u);
+      const cached = backend.loadCached(u.id, u.username);
+      // newest copy wins (the cache can be newer if the last cloud save didn't go through)
+      const copies = [cloud?.data, cached].filter((x): x is UserData => !!x);
+      let d: UserData = copies.length ? copies.reduce((a, b) => (b.updatedAt > a.updatedAt ? b : a)) : newUserData(u.username);
+      const untouched = (x: UserData) => x.totalPlays === 0 && x.xp === 0 && x.coins === 0 && Object.keys(x.saves).length === 0;
+      if ((opts.isNew || opts.mergeGuest) && guest.totalPlays > 0) {
+        d = untouched(d) ? { ...guest, achievements: { ...guest.achievements } } : mergeProgress(d, guest);
+        backend.saveGuest(newUserData('Guest')); // progress moved into the account
       }
-      if (opts.isNew || opts.mergeGuest) {
-        if (guest.totalPlays > 0) backend.saveGuest(newUserData('Guest')); // progress moved into the account
-      }
-      d = ensureDaily(d);
+      // the database is the source of truth for the username (it may have picked a free variant)
+      const username = cloud?.username || (d.username && d.username !== 'Guest' ? d.username : u.username);
+      d = ensureDaily({ ...d, username });
+      u = { ...u, username };
       setUser(u);
       setData(d);
       if (u.provider === 'supabase') {
@@ -199,9 +210,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const u = await backend.restoreSession();
+        const recovery = await backend.startRecoverySession();
+        const u = recovery ?? (await backend.restoreSession());
         if (u) await enterAccount(u);
         else setData(ensureDaily(backend.loadGuest()));
+        if (recovery) setRecoveryOpen(true);
       } catch {
         setData(ensureDaily(backend.loadGuest()));
       } finally {
@@ -417,12 +430,30 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     [enterAccount, toast],
   );
 
+  const loggingOut = useRef(false);
   const logout = useCallback(async () => {
-    await backend.logout();
+    loggingOut.current = true;
+    try {
+      await backend.logout();
+    } finally {
+      loggingOut.current = false;
+    }
     setUser(null);
     setData(ensureDaily(backend.loadGuest()));
     toast({ icon: '👋', title: 'Logged out', desc: 'Playing as guest' });
   }, [setData, toast]);
+
+  // the cloud session ended somewhere else (logged out in another tab, or the session was revoked)
+  useEffect(
+    () =>
+      backend.onCloudSignOut(() => {
+        if (loggingOut.current || userRef.current?.provider !== 'supabase') return;
+        setUser(null);
+        setData(ensureDaily(backend.loadGuest()));
+        toast({ icon: '🔒', title: 'You were logged out', desc: 'Log in again to keep saving progress online.' });
+      }),
+    [setData, toast],
+  );
 
   const resetProgress = useCallback(() => {
     const d = newUserData(dataRef.current.username);
@@ -438,9 +469,9 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       finishGame, reportScore, grant, markOpened, toggleFavorite, saveGame,
       claimLogin, claimChallenge, setAvatar, setUsername,
       register, login, logout, resetProgress,
-      authOpen, openAuth, settingsOpen, openSettings,
+      authOpen, openAuth, settingsOpen, openSettings, recoveryOpen, setRecoveryOpen, syncError,
     }),
-    [ready, user, data, settings, toasts, syncing, updateSettings, sound, toast, dismissToast, finishGame, reportScore, grant, markOpened, toggleFavorite, saveGame, claimLogin, claimChallenge, setAvatar, setUsername, register, login, logout, resetProgress, authOpen, settingsOpen],
+    [recoveryOpen, syncError, ready, user, data, settings, toasts, syncing, updateSettings, sound, toast, dismissToast, finishGame, reportScore, grant, markOpened, toggleFavorite, saveGame, claimLogin, claimChallenge, setAvatar, setUsername, register, login, logout, resetProgress, authOpen, settingsOpen],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -3,7 +3,7 @@ import { supabase } from '../../lib/backend';
 import type { Avatar } from '../../lib/types';
 import type { PlainMove } from './ChessBoard';
 
-/* Online chess backend. Production talks to Supabase (see supabase/migrations/004_online_chess.sql);
+/* Online chess backend. Production talks to Supabase (see supabase/schema.sql);
  * development builds can swap in a local mock for testing two tabs on one machine. */
 
 export interface OnlineGame {
@@ -27,6 +27,8 @@ export interface OnlineGame {
   winner: 'w' | 'b' | null;
   result_reason: string | null;
   updated_at: string;
+  rematch_id?: string | null;
+  rematch_by?: 'w' | 'b' | null;
 }
 
 export type GameResult = { reason: 'checkmate' | 'stalemate' | 'insufficient' | 'fifty' | 'repetition' };
@@ -44,8 +46,17 @@ export interface OnlineBackend {
   answerDraw: (id: string, accept: boolean) => Promise<OnlineGame>;
   claimTimeout: (id: string) => Promise<OnlineGame>;
   cancel: (id: string) => Promise<void>;
+  /** Keeps a waiting game visible to matchmaking (call every few seconds). */
+  heartbeat: (id: string) => Promise<OnlineGame | null>;
+  /** Ask for (or accept) a rematch of a finished game. */
+  rematch: (id: string, name: string, avatar: Avatar) => Promise<OnlineGame>;
   /** Live updates for one game + whether the opponent is connected. Returns an unsubscribe function. */
-  subscribe: (id: string, onGame: (g: OnlineGame) => void, onPresence: (opponentOnline: boolean) => void) => () => void;
+  subscribe: (
+    id: string,
+    onGame: (g: OnlineGame) => void,
+    onPresence: (opponentOnline: boolean) => void,
+    onStatus?: (live: boolean) => void,
+  ) => () => void;
 }
 
 const asGame = (data: unknown): OnlineGame => {
@@ -56,7 +67,7 @@ const asGame = (data: unknown): OnlineGame => {
 
 const friendly = (msg: string) =>
   /function .* does not exist|Could not find the function|relation .*chess_games.* does not exist|schema cache/i.test(msg)
-    ? 'Online chess is not set up on the server yet (run supabase/migrations/004_online_chess.sql in Supabase).'
+    ? 'Online chess is not set up on the server yet (run supabase/schema.sql in Supabase).'
     : msg;
 
 function supabaseBackend(): OnlineBackend {
@@ -72,7 +83,8 @@ function supabaseBackend(): OnlineBackend {
     createPrivate: async (t, name, avatar) => asGame(await rpc('chess_new_game', { p_time_ms: t, p_private: true, p_name: name, p_avatar: avatar })),
     join: async (code, name, avatar) => asGame(await rpc('chess_join', { p_code: code, p_name: name, p_avatar: avatar })),
     get: async (id) => {
-      const { data, error } = await sb.from('chess_games').select('*').eq('id', id).maybeSingle();
+      // no built-in retries: our own polling/retry logic handles failures and must not stall
+      const { data, error } = await sb.from('chess_games').select('*').eq('id', id).retry(false).maybeSingle();
       if (error) throw new Error(friendly(error.message));
       return data ? asGame(data) : null;
     },
@@ -85,7 +97,8 @@ function supabaseBackend(): OnlineBackend {
         .or(`white.eq.${uid},black.eq.${uid}`)
         .in('status', ['waiting', 'active'])
         .order('updated_at', { ascending: false })
-        .limit(6);
+        .limit(6)
+        .retry(false);
       if (error) throw new Error(friendly(error.message));
       return (data ?? []).map(asGame);
     },
@@ -98,7 +111,12 @@ function supabaseBackend(): OnlineBackend {
     cancel: async (id) => {
       await rpc('chess_cancel', { p_id: id });
     },
-    subscribe: (id, onGame, onPresence) => {
+    heartbeat: async (id) => {
+      const data = await rpc('chess_heartbeat', { p_id: id });
+      return data && (data as OnlineGame).id ? asGame(data) : null;
+    },
+    rematch: async (id, name, avatar) => asGame(await rpc('chess_rematch', { p_id: id, p_name: name, p_avatar: avatar })),
+    subscribe: (id, onGame, onPresence, onStatus) => {
       let channel: RealtimeChannel | null = null;
       let stopped = false;
       (async () => {
@@ -118,11 +136,13 @@ function supabaseBackend(): OnlineBackend {
             onPresence(keys.some((k) => k !== uid));
           })
           .subscribe(async (status) => {
+            onStatus?.(status === 'SUBSCRIBED');
             if (status === 'SUBSCRIBED') await channel?.track({ at: Date.now() });
           });
       })();
       return () => {
         stopped = true;
+        onStatus?.(false);
         if (channel) void sb.removeChannel(channel);
       };
     },

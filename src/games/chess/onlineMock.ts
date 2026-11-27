@@ -34,9 +34,9 @@ function save(g: OnlineGame) {
 }
 const finish = (g: OnlineGame, winner: 'w' | 'b' | null, reason: string) => save({ ...g, status: 'finished', winner, result_reason: reason, draw_offer: null });
 
-function newGame(t: number, priv: boolean, name: string, avatar: Avatar): OnlineGame {
+function newGame(t: number, priv: boolean, name: string, avatar: Avatar, color?: 'w' | 'b'): OnlineGame {
   const u = uid();
-  const white = Math.random() < 0.5;
+  const white = color ? color === 'w' : Math.random() < 0.5;
   return save({
     id: crypto.randomUUID(),
     code: Math.random().toString(36).slice(2, 8).toUpperCase(),
@@ -80,7 +80,8 @@ export function mockBackend(): OnlineBackend {
     findMatch: async (t, name, avatar) => {
       const u = uid();
       const waiting = Object.values(load()).filter((g) => g.status === 'waiting' && !g.is_private && g.time_ms === t);
-      const other = waiting.find((g) => g.created_by !== u);
+      const fresh = (g: OnlineGame) => Date.now() - Date.parse((g as OnlineGame & { seen_at?: string }).seen_at ?? g.updated_at) < 25000;
+      const other = waiting.find((g) => g.created_by !== u && fresh(g));
       if (other) return takeSeat(other, name, avatar);
       const mine = waiting.find((g) => g.created_by === u);
       return mine ?? newGame(t, false, name, avatar);
@@ -149,13 +150,36 @@ export function mockBackend(): OnlineBackend {
       const left = (t === 'w' ? g.white_ms : g.black_ms) - elapsed(g);
       return left <= 0 ? finish({ ...g, white_ms: t === 'w' ? 0 : g.white_ms, black_ms: t === 'b' ? 0 : g.black_ms }, t === 'w' ? 'b' : 'w', 'timeout') : g;
     },
+    heartbeat: async (id) => {
+      const g = load()[id];
+      if (!g) return null;
+      if (g.status === 'waiting' && g.created_by === uid()) return save({ ...g, seen_at: iso() } as OnlineGame);
+      return g;
+    },
+    rematch: async (id, name, avatar) => {
+      const old = get(id);
+      const me = colorOf(old, uid());
+      if (!me) throw new Error('You did not play in that game');
+      if (old.status !== 'finished') throw new Error('That game is not finished yet');
+      if (old.rematch_id) {
+        const g = get(old.rematch_id);
+        if (colorOf(g, uid())) return g;
+        if (g.status !== 'waiting') throw new Error('That rematch is no longer available');
+        return takeSeat(g, name, avatar);
+      }
+      const g = newGame(old.time_ms, true, name, avatar, me === 'w' ? 'b' : 'w');
+      save({ ...old, rematch_id: g.id, rematch_by: me });
+      return g;
+    },
     cancel: async (id) => {
       const g = load()[id];
       if (g && g.created_by === uid() && g.status === 'waiting') save({ ...g, status: 'cancelled' });
     },
-    subscribe: (id, onGame, onPresence) => {
+    subscribe: (id, onGame, onPresence, onStatus) => {
       const me = uid();
+      onStatus?.(localStorage.getItem('neonplay:mockNoRealtime') !== '1');
       const onMsg = (e: MessageEvent) => {
+        if (localStorage.getItem('neonplay:mockNoRealtime') === '1') return; // simulate realtime being down
         if (e.data?.type === 'update' && e.data.game.id === id) onGame(e.data.game);
         if (e.data?.type === 'here' && e.data.id === id && e.data.user !== me) onPresence(true);
         if (e.data?.type === 'bye' && e.data.id === id && e.data.user !== me) onPresence(false);

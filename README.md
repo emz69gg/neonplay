@@ -15,20 +15,21 @@ Everything works without any setup. When Supabase isn't configured:
 - **Guests** keep their progress in localStorage.
 - **Accounts** are stored in the browser (passwords are salted and SHA-256 hashed). Leaderboards show the players on that device.
 
-## Turning on Supabase (cloud accounts and global leaderboards)
+## Turning on Supabase (cloud accounts, global leaderboards, online chess)
 
 1. Create a project at supabase.com.
-2. Open **SQL Editor**, then paste and run `supabase/schema.sql`. (Upgrading an existing project? Run the files in `supabase/migrations/` instead.)
-3. Copy `.env.example` to `.env.local` and fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from Project Settings → API.
-4. Restart `npm run dev`. Signing up now uses email and password. Progress syncs to `profiles.data`, and best scores go to `scores`, which feeds the global leaderboards.
-
-If email confirmation is turned on in Supabase Auth, new players see a "check your inbox" message before they can log in.
+2. **SQL Editor → New query**: paste all of `supabase/schema.sql` and click **Run**. It sets up everything (profiles, scores, online chess) and is safe to run again after updates.
+3. **Authentication → Sign In / Providers → Email**: switch **Confirm email** off, so players can log in straight after signing up. (The SQL also auto-confirms new accounts as a backup.)
+4. **Authentication → URL Configuration**: set **Site URL** to your site's address (used by password-reset links).
+5. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (the publishable/anon key) to `.env.local`, or as GitHub Actions secrets for the Pages deploy.
 
 > Scores are submitted by the client. Row-level security makes sure players can only write their own rows, but it can't stop cheated scores. For competitive play, validate scores in an Edge Function.
 
 ## Online chess
 
-Online 1v1 chess needs `supabase/migrations/004_online_chess.sql` (run it once in the Supabase SQL Editor). Players must be logged in. Every move goes through security-definer functions that check turn order and run the chess clocks on the server; clients validate the moves they receive. For local testing without a server, set `localStorage['neonplay:mockOnline'] = '1'` in a dev build and open two tabs.
+Players must be logged in. Every move goes through security-definer database functions that check turn order and run the chess clocks on the server; each browser checks that the opponent's moves are legal. The client stays in sync through Supabase Realtime plus polling, refetches when the tab wakes up or the network returns, retries moves after connection drops, resumes your game after a reload, and supports rematches. Waiting players send a heartbeat so matchmaking never pairs you with someone who already left.
+
+For local testing without a server, set `localStorage['neonplay:mockOnline'] = '1'` in a dev build and open two tabs.
 
 ## Project structure
 

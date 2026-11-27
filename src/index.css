@@ -114,3 +114,4 @@
 @keyframes popup { from { transform: translateY(100%); } to { transform: translateY(0); } }
 @keyframes popdown { from { transform: translateY(0); } to { transform: translateY(100%); } }
 @keyframes aimshrink { from { transform: scale(1); } to { transform: scale(0); } }
+@keyframes pieceslide { from { transform: translate(var(--dx), var(--dy)); } to { transform: none; } }

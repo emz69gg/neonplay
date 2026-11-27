@@ -4,7 +4,7 @@ import { isCloud } from '../lib/backend';
 import { CATEGORIES } from '../lib/games';
 import { levelFromXp } from '../lib/progression';
 import { useStore } from '../store/AppStore';
-import AuthModal from './AuthModal';
+import AuthModal, { SetPasswordModal } from './AuthModal';
 import SearchBox from './SearchBox';
 import SettingsModal from './SettingsModal';
 import { AvatarBubble, Coin, XPBar } from './ui';
@@ -32,7 +32,7 @@ const NAV = [
 ];
 
 function UserMenu() {
-  const { user, data, openAuth, logout, openSettings } = useStore();
+  const { user, data, openAuth, logout, openSettings, syncError } = useStore();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -55,6 +55,7 @@ function UserMenu() {
           <div className="px-3 py-2">
             <div className="font-semibold">{data.username}</div>
             <div className="text-xs text-muted">{user ? (user.provider === 'supabase' ? 'Cloud account' : 'Account on this device') : 'Guest — progress saved in this browser'}</div>
+            {user?.provider === 'supabase' && syncError && <div className="mt-1 text-xs font-semibold text-amber-400">⚠ Couldn’t save online — retrying on your next change</div>}
             <div className="mt-2.5">
               <XPBar xp={data.xp} />
             </div>
@@ -245,6 +246,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       <MobileNav />
       <Toasts />
       <AuthModal />
+      <SetPasswordModal />
       <SettingsModal />
     </div>
   );

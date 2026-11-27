@@ -2,7 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useSearchParams } from 'react-router-dom';
 import { Spinner } from '../components/ui';
 import { chooseMove, type Level } from './chess/ai';
-import { ChessBoard, material, MoveList, PlayerBar, replay, type PlainMove } from './chess/ChessBoard';
+import { BoardNav, ChessBoard, material, MoveList, PlayerBar, replay, type PlainMove } from './chess/ChessBoard';
 import { fromFen, inCheck, kingSquare, legalMoves, outcome, toFen, type Color, type Move, type Outcome } from './chess/engine';
 import type { GameProps } from './shared';
 
@@ -30,6 +30,14 @@ const REASON: Record<string, string> = {
   resign: 'Resignation',
 };
 
+const hasActiveOnlineGame = () => {
+  try {
+    return !!localStorage.getItem('neonplay:chessOnlineActive');
+  } catch {
+    return false;
+  }
+};
+
 let worker: Worker | null | undefined;
 function getWorker(): Worker | null {
   if (worker !== undefined) return worker;
@@ -46,7 +54,8 @@ export default function Chess({ api, fresh }: GameProps) {
   const joinCode = params.get('join');
   const loaded = api.load<Save>();
   const [g, setG] = useState<Save>(() => ({
-    mode: joinCode ? 'online' : loaded?.mode ?? 'ai',
+    // jump back into an online game that's still running
+    mode: joinCode || hasActiveOnlineGame() ? 'online' : loaded?.mode ?? 'ai',
     level: loaded?.level ?? 'medium',
     human: loaded?.human ?? 'w',
     moves: fresh ? [] : loaded?.moves ?? [],
@@ -58,7 +67,9 @@ export default function Chess({ api, fresh }: GameProps) {
   const [flipManual, setFlipManual] = useState(false);
   const reqId = useRef(0);
 
-  const { state, sans, keys, applied } = useMemo(() => replay(g.moves), [g.moves]);
+  const { state, sans, keys, applied, positions } = useMemo(() => replay(g.moves), [g.moves]);
+  const [view, setView] = useState<number | null>(null); // reviewing an earlier position
+  useEffect(() => setView(null), [g.moves.length]);
   const result: Outcome = useMemo(() => {
     if (g.resigned) return { over: true, winner: g.resigned === 'w' ? 'b' : 'w', reason: 'resign' };
     return outcome(state, keys);
@@ -179,7 +190,8 @@ export default function Chess({ api, fresh }: GameProps) {
     setG((p) => ({ ...p, resigned: p.mode === 'ai' ? p.human : turn }));
   };
 
-  const mat = useMemo(() => material(state), [state]);
+  const shown = view === null ? state : positions[view];
+  const mat = useMemo(() => material(shown), [shown]);
   const names: Record<Color, string> = g.mode === 'ai' ? (g.human === 'w' ? { w: 'You', b: 'AI' } : { w: 'AI', b: 'You' }) : { w: 'White', b: 'Black' };
 
   let status: string;
@@ -236,16 +248,23 @@ export default function Chess({ api, fresh }: GameProps) {
       <div className="mx-auto flex w-full max-w-[560px] flex-col gap-2">
         {bar(flipped ? 'w' : 'b')}
         <ChessBoard
-          state={state}
-          legal={legal}
-          interactive={humanTurn && !thinking && !result.over}
+          state={shown}
+          legal={view === null ? legal : []}
+          interactive={view === null && humanTurn && !thinking && !result.over}
           flipped={flipped}
-          last={applied[applied.length - 1]}
-          checkSq={checkSq}
+          last={applied[(view ?? applied.length) - 1]}
+          animKey={view ?? applied.length}
+          checkSq={view === null ? checkSq : -1}
           onMove={pushMove}
           onSound={(s) => api.sound(s)}
         />
         {bar(flipped ? 'b' : 'w')}
+        <BoardNav total={applied.length} view={view} setView={setView} />
+        {view !== null && (
+          <button className="btn-ghost w-full !py-1.5 text-xs" onClick={() => setView(null)}>
+            Viewing move {Math.ceil(view / 2)}{view % 2 ? '' : '…'} — back to the game ⏭
+          </button>
+        )}
       </div>
 
       <div className="flex min-w-0 flex-col gap-3">
@@ -288,7 +307,7 @@ export default function Chess({ api, fresh }: GameProps) {
           <p className="text-xs text-muted">Changing these starts a new game. Want a real opponent? Try 🌐 Online.</p>
         </div>
 
-        <MoveList sans={sans} emptyText={g.mode === 'ai' && g.human === 'b' ? 'The AI plays first.' : 'White moves first.'} />
+        <MoveList sans={sans} viewing={view} onSelect={(ply) => setView(ply >= sans.length ? null : ply)} emptyText={g.mode === 'ai' && g.human === 'b' ? 'The AI plays first.' : 'White moves first.'} />
         <p className="text-center text-xs text-muted">Click or tap a piece, then a square — or drag it. Your game is saved automatically.</p>
       </div>
     </div>
