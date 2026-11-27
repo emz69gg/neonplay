@@ -1,3 +1,4 @@
+import { Frame, Pet } from './Cosmetics';
 import { useEffect, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { AVATAR_COLORS, levelProgress } from '../lib/progression';
@@ -15,15 +16,23 @@ export function Spinner({ size = 36, label }: { size?: number; label?: string })
   );
 }
 
-export function AvatarBubble({ avatar, size = 40, ring = false }: { avatar: Avatar; size?: number; ring?: boolean }) {
+export function AvatarBubble({ avatar, size = 40, ring = false, cosmetics = true }: { avatar: Avatar; size?: number; ring?: boolean; cosmetics?: boolean }) {
   const [a, b] = AVATAR_COLORS[avatar.color] ?? AVATAR_COLORS.violet;
   return (
     <div
-      className={`grid shrink-0 place-items-center rounded-full ${ring ? 'ring-2 ring-neon-purple/70 ring-offset-2 ring-offset-bg' : ''}`}
-      style={{ width: size, height: size, background: `linear-gradient(135deg, ${a}, ${b})`, fontSize: size * 0.5 }}
+      className="relative shrink-0"
+      // leave room for a companion sitting beside the avatar
+      style={{ width: size, height: size, marginRight: cosmetics && avatar.pet && avatar.pet !== 'spirit' ? Math.max(10, size * 0.36) : undefined }}
       aria-hidden
     >
-      <span style={{ lineHeight: 1 }}>{avatar.emoji}</span>
+      <div
+        className={`grid h-full w-full place-items-center rounded-full ${ring ? 'ring-2 ring-neon-purple/70 ring-offset-2 ring-offset-bg' : ''}`}
+        style={{ background: `linear-gradient(135deg, ${a}, ${b})`, fontSize: size * 0.5 }}
+      >
+        <span style={{ lineHeight: 1 }}>{avatar.emoji}</span>
+      </div>
+      {cosmetics && <Frame id={avatar.frame} size={size} />}
+      {cosmetics && <Pet id={avatar.pet} size={size} />}
     </div>
   );
 }

@@ -4,6 +4,8 @@ import { isCloud } from '../lib/backend';
 import { CATEGORIES } from '../lib/games';
 import { levelFromXp } from '../lib/progression';
 import { useStore } from '../store/AppStore';
+import { PlayerName } from './Cosmetics';
+import EffectsLayer from './EffectsLayer';
 import AuthModal, { SetPasswordModal } from './AuthModal';
 import SearchBox from './SearchBox';
 import SettingsModal from './SettingsModal';
@@ -27,6 +29,7 @@ export function Logo() {
 const NAV = [
   { to: '/', label: 'Home', icon: '🏠', end: true },
   { to: '/games', label: 'Games', icon: '🎮' },
+  { to: '/shop', label: 'Shop', icon: '🛍️' },
   { to: '/leaderboard', label: 'Leaderboard', icon: '🏆' },
   { to: '/profile', label: 'Profile', icon: '👤' },
 ];
@@ -48,12 +51,12 @@ function UserMenu() {
           <AvatarBubble avatar={data.avatar} size={36} />
           <span className="absolute -bottom-1 -right-1 rounded-full bg-gradient-to-r from-neon-purple to-neon-blue px-1.5 text-[10px] font-extrabold text-white ring-2 ring-bg">{lvl}</span>
         </div>
-        <span className="hidden max-w-[110px] truncate text-sm font-semibold sm:block">{data.username}</span>
+        <PlayerName name={data.username} avatar={data.avatar} className="hidden max-w-[130px] text-sm font-semibold sm:inline-flex" />
       </button>
       {open && (
         <div className="card absolute right-0 top-full z-50 mt-2 w-64 p-2 shadow-2xl animate-fade-up" role="menu">
           <div className="px-3 py-2">
-            <div className="font-semibold">{data.username}</div>
+            <PlayerName name={data.username} avatar={data.avatar} className="font-semibold" />
             <div className="text-xs text-muted">{user ? (user.provider === 'supabase' ? 'Cloud account' : 'Account on this device') : 'Guest — progress saved in this browser'}</div>
             {user?.provider === 'supabase' && syncError && <div className="mt-1 text-xs font-semibold text-amber-400">⚠ Couldn’t save online — retrying on your next change</div>}
             <div className="mt-2.5">
@@ -101,7 +104,7 @@ function Navbar() {
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 sm:gap-5 sm:px-6">
         <Logo />
         <nav className="ml-4 hidden items-center gap-1 lg:flex" aria-label="Main">
-          {NAV.slice(0, 3).map((n) => (
+          {NAV.slice(0, 4).map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
@@ -112,12 +115,12 @@ function Navbar() {
             </NavLink>
           ))}
         </nav>
-        <div className="ml-auto hidden w-full max-w-xs md:block">
+        <div className="ml-auto hidden w-full max-w-xs md:block lg:max-w-[240px] xl:max-w-xs">
           <SearchBox />
         </div>
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2 md:ml-0">
           <button className="btn-ghost h-9 w-9 !p-0 md:hidden" onClick={() => setSearchOpen((s) => !s)} aria-label="Search">⌕</button>
-          <Link to="/profile" className="hidden items-center gap-1.5 rounded-full bg-surface2 px-3 py-1.5 text-sm font-bold sm:flex" title="Your coins">
+          <Link to="/shop" id="coin-balance" className="hidden items-center gap-1.5 rounded-full bg-surface2 px-3 py-1.5 text-sm font-bold transition hover:bg-line/60 sm:flex" title="Your coins — open the shop">
             <Coin /> {data.coins.toLocaleString()}
           </Link>
           <button
@@ -133,7 +136,7 @@ function Navbar() {
           </button>
           <button className="btn-ghost hidden h-9 w-9 !p-0 sm:grid" onClick={() => openSettings(true)} aria-label="Settings" title="Settings">⚙️</button>
           {!user && (
-            <button className="btn-primary hidden !py-2 sm:inline-flex" onClick={() => openAuth('register')}>
+            <button className="btn-primary hidden whitespace-nowrap !py-2 sm:inline-flex" onClick={() => openAuth('register')}>
               Sign up
             </button>
           )}
@@ -152,7 +155,7 @@ function Navbar() {
 function MobileNav() {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line/60 bg-bg/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden" aria-label="Mobile">
-      <div className="mx-auto grid max-w-md grid-cols-4">
+      <div className="mx-auto grid max-w-md grid-cols-5">
         {NAV.map((n) => (
           <NavLink
             key={n.to}
@@ -192,6 +195,7 @@ function Footer() {
           <div className="mb-3 text-sm font-bold">Explore</div>
           <ul className="space-y-2 text-sm text-muted">
             <li><Link to="/games" className="hover:text-fg">All games</Link></li>
+            <li><Link to="/shop" className="hover:text-fg">Shop</Link></li>
             <li><Link to="/leaderboard" className="hover:text-fg">Leaderboards</Link></li>
             <li><Link to="/profile" className="hover:text-fg">Your profile</Link></li>
             <li><Link to="/profile#achievements" className="hover:text-fg">Achievements</Link></li>
@@ -245,6 +249,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       <Footer />
       <MobileNav />
       <Toasts />
+      <EffectsLayer />
       <AuthModal />
       <SetPasswordModal />
       <SettingsModal />

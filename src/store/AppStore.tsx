@@ -1,3 +1,5 @@
+import { emitFx } from '../lib/fx';
+import { ITEM_MAP, KIND_INFO, owns, priceOf, randomUnowned, RARITY_PRICE, RARITY_STYLE, rollSpin, SPIN_PRIZES, type Item, type Kind, type SpinPrize } from '../lib/cosmetics';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as backend from '../lib/backend';
 import { GAME_MAP, isBetter, todayKey } from '../lib/games';
@@ -8,6 +10,7 @@ import {
   dailyChallenges,
   freshDaily,
   levelFromXp,
+  LEVEL_UP_COINS,
   loginStatus,
   mergeProgress,
   newUserData,
@@ -66,6 +69,10 @@ interface Store {
   claimLogin: () => void;
   claimChallenge: (id: string) => void;
   setAvatar: (a: Avatar) => { ok: boolean; error?: string };
+  buyItem: (id: string) => { ok: boolean; error?: string };
+  equipItem: (id: string) => void;
+  unequip: (kind: Kind) => void;
+  spinWheel: () => { index: number; prize: SpinPrize; item: Item | null; coins: number } | null;
   setUsername: (name: string) => Promise<string | null>;
   register: typeof backend.register;
   login: typeof backend.login;
@@ -88,6 +95,10 @@ export const useStore = () => {
 const ensureDaily = (d: UserData): UserData => (d.daily.date === todayKey() ? d : { ...d, daily: freshDaily() });
 
 /** Unlock any achievements now satisfied; returns updated data + unlocked ids. Loops because rewards can unlock more. */
+const coinFx = (amount: number) => {
+  if (amount > 0) emitFx({ type: 'coins', amount });
+};
+
 function applyAchievements(d: UserData, e?: GameEvent): { d: UserData; unlocked: string[] } {
   const unlocked: string[] = [];
   let cur = d;
@@ -108,6 +119,9 @@ function applyAchievements(d: UserData, e?: GameEvent): { d: UserData; unlocked:
     }
     if (!changed) break;
   }
+  // coin bonus for every level gained
+  const lvl = levelFromXp(cur.xp);
+  if (lvl > cur.levelBonusPaid) cur = { ...cur, coins: cur.coins + (lvl - cur.levelBonusPaid) * LEVEL_UP_COINS, levelBonusPaid: lvl };
   return { d: cur, unlocked };
 }
 
@@ -233,7 +247,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       const lvl = levelFromXp(newXp);
       if (lvl > prevLevel) {
         playSound('level');
-        toast({ icon: '⬆️', title: `Level up! You're now level ${lvl}`, tone: 'success' });
+        toast({ icon: '⬆️', title: `Level up! You're now level ${lvl}`, desc: `+${LEVEL_UP_COINS * (lvl - prevLevel)} coins bonus`, tone: 'success' });
       } else if (unlocked.length) playSound('coin');
     },
     [toast],
@@ -243,6 +257,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     (game: GameId, score: number, meta?: FinishMeta): FinishResult => {
       const meta0 = GAME_MAP[game];
       let d = ensureDaily(dataRef.current);
+      const coinsBefore = d.coins;
       const prevLevel = levelFromXp(d.xp);
       const prevBest = d.highScores[game];
       const newBest = Number.isFinite(score) && isBetter(meta0, score, prevBest);
@@ -273,6 +288,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       d = ach.d;
       setData(d);
       announce(ach.unlocked, prevLevel, d.xp);
+      if (meta?.win === true || (newBest && prevBest !== undefined)) emitFx({ type: 'win' });
+      coinFx(d.coins - coinsBefore);
       if (newBest && userRef.current) void backend.pushScore(userRef.current, d, game, score);
       const lvl = levelFromXp(d.xp);
       return { reward, newBest, previousBest: prevBest, levelUp: lvl > prevLevel ? lvl : undefined, unlocked: ach.unlocked };
@@ -299,6 +316,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       const prevLevel = levelFromXp(d0.xp);
       const ach = applyAchievements({ ...d0, xp: d0.xp + r.xp, coins: d0.coins + r.coins });
       setData(ach.d);
+      coinFx(ach.d.coins - d0.coins);
       toast({ icon: '🪙', title: reason, desc: `+${r.xp} XP · +${r.coins} coins`, tone: 'gold' });
       playSound('coin');
       announce(ach.unlocked, prevLevel, ach.d.xp);
@@ -349,6 +367,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       login: { lastClaim: todayKey(), streak: st.nextStreak },
     });
     setData(ach.d);
+    coinFx(ach.d.coins - d0.coins);
     playSound('coin');
     toast({ icon: '🎁', title: `Day ${st.nextStreak} reward claimed`, desc: `+${st.reward.coins} coins · +${st.reward.xp} XP`, tone: 'gold' });
     announce(ach.unlocked, prevLevel, ach.d.xp);
@@ -367,12 +386,96 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         daily: { ...d0.daily, claimed: [...d0.daily.claimed, id] },
       });
       setData(ach.d);
+      coinFx(ach.d.coins - d0.coins);
       playSound('coin');
       toast({ icon: c.icon, title: 'Challenge reward claimed', desc: `+${c.reward.coins} coins · +${c.reward.xp} XP`, tone: 'gold' });
       announce(ach.unlocked, prevLevel, ach.d.xp);
     },
     [announce, setData, toast],
   );
+
+  /* ---- shop ---- */
+  const equipItem = useCallback(
+    (id: string) => {
+      const d = dataRef.current;
+      const item = ITEM_MAP[id];
+      if (!item || !owns(d.unlocks, id)) return;
+      if (item.kind === 'emoji') setData({ ...d, avatar: { ...d.avatar, emoji: item.key } });
+      else if (item.kind === 'color') setData({ ...d, avatar: { ...d.avatar, color: item.key } });
+      else if (['frame', 'name', 'bg', 'badge', 'pet'].includes(item.kind)) setData({ ...d, avatar: { ...d.avatar, [item.kind]: item.key } });
+      else setData({ ...d, fx: { ...d.fx, [item.kind]: item.key } });
+      playSound('click');
+    },
+    [setData],
+  );
+
+  const unequip = useCallback(
+    (kind: Kind) => {
+      const d = dataRef.current;
+      if (kind === 'emoji' || kind === 'color') return;
+      if (['frame', 'name', 'bg', 'badge', 'pet'].includes(kind)) {
+        const avatar = { ...d.avatar };
+        delete avatar[kind as 'frame'];
+        setData({ ...d, avatar });
+      } else {
+        const fx = { ...d.fx };
+        delete fx[kind as 'trail'];
+        setData({ ...d, fx });
+      }
+      playSound('click');
+    },
+    [setData],
+  );
+
+  const buyItem = useCallback(
+    (id: string): { ok: boolean; error?: string } => {
+      const d = dataRef.current;
+      const item = ITEM_MAP[id];
+      if (!item) return { ok: false, error: 'That item doesn’t exist' };
+      if (owns(d.unlocks, id)) return { ok: true };
+      const price = priceOf(item);
+      if (d.coins < price) {
+        playSound('error');
+        return { ok: false, error: `You need ${(price - d.coins).toLocaleString()} more coins` };
+      }
+      const ach = applyAchievements({ ...d, coins: d.coins - price, unlocks: [...d.unlocks, id] });
+      setData(ach.d);
+      playSound('coin');
+      toast({ icon: item.icon ?? KIND_INFO[item.kind].icon, title: `Unlocked ${item.name}!`, desc: `${RARITY_STYLE[item.rarity].label} ${KIND_INFO[item.kind].label.toLowerCase()} · −${price.toLocaleString()} coins`, tone: 'gold' });
+      announce(ach.unlocked, levelFromXp(d.xp), ach.d.xp);
+      equipItem(id);
+      return { ok: true };
+    },
+    [announce, equipItem, setData, toast],
+  );
+
+  /** Free daily spin. Applies the prize straight away and returns it so the wheel can animate to it. */
+  const spinWheel = useCallback((): { index: number; prize: SpinPrize; item: Item | null; coins: number } | null => {
+    const d0 = ensureDaily(dataRef.current);
+    if (d0.spin.last === todayKey()) return null;
+    const index = rollSpin();
+    const prize = SPIN_PRIZES[index];
+    let item: Item | null = null;
+    let coins = prize.coins ?? 0;
+    if (prize.item) {
+      item = randomUnowned(d0.unlocks, prize.item);
+      if (!item) coins = Math.round(RARITY_PRICE[prize.item] / 2); // you own everything of that rarity
+    }
+    const prevLevel = levelFromXp(d0.xp);
+    const ach = applyAchievements({
+      ...d0,
+      coins: d0.coins + coins,
+      xp: d0.xp + (prize.xp ?? 0),
+      unlocks: item ? [...d0.unlocks, item.id] : d0.unlocks,
+      spin: { last: todayKey() },
+    });
+    setData(ach.d);
+    window.setTimeout(() => {
+      coinFx(coins);
+      announce(ach.unlocked, prevLevel, ach.d.xp);
+    }, 4200);
+    return { index, prize, item, coins };
+  }, [announce, setData]);
 
   const setAvatar = useCallback(
     (a: Avatar) => {
@@ -386,7 +489,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       const unlocks = [...d.unlocks];
       if (needEmoji) unlocks.push(`emoji:${a.emoji}`);
       if (needColor) unlocks.push(`color:${a.color}`);
-      setData({ ...d, avatar: a, coins: d.coins - cost, unlocks });
+      setData({ ...d, avatar: { ...d.avatar, ...a }, coins: d.coins - cost, unlocks });
       playSound(cost ? 'coin' : 'click');
       if (cost) toast({ icon: a.emoji, title: 'Unlocked!', desc: `Spent ${cost} coins`, tone: 'gold' });
       return { ok: true };
@@ -467,11 +570,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       ready, user, data, settings, toasts, syncing,
       updateSettings, sound, toast, dismissToast,
       finishGame, reportScore, grant, markOpened, toggleFavorite, saveGame,
-      claimLogin, claimChallenge, setAvatar, setUsername,
+      claimLogin, claimChallenge, setAvatar, setUsername, buyItem, equipItem, unequip, spinWheel,
       register, login, logout, resetProgress,
       authOpen, openAuth, settingsOpen, openSettings, recoveryOpen, setRecoveryOpen, syncError,
     }),
-    [recoveryOpen, syncError, ready, user, data, settings, toasts, syncing, updateSettings, sound, toast, dismissToast, finishGame, reportScore, grant, markOpened, toggleFavorite, saveGame, claimLogin, claimChallenge, setAvatar, setUsername, register, login, logout, resetProgress, authOpen, settingsOpen],
+    [recoveryOpen, syncError, ready, user, data, settings, toasts, syncing, updateSettings, sound, toast, dismissToast, finishGame, reportScore, grant, markOpened, toggleFavorite, saveGame, claimLogin, claimChallenge, setAvatar, setUsername, buyItem, equipItem, unequip, spinWheel, register, login, logout, resetProgress, authOpen, settingsOpen],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

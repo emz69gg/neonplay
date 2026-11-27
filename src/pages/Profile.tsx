@@ -7,6 +7,7 @@ import { AvatarBubble, Coin, EmptyState, XPBar } from '../components/ui';
 import { isCloud } from '../lib/backend';
 import { formatScore, GAME_MAP, GAMES } from '../lib/games';
 import { ACHIEVEMENTS, AVATAR_COLORS, AVATARS, COLOR_COST, levelFromXp, rankTitle } from '../lib/progression';
+import { bannerStyle, PlayerName } from '../components/Cosmetics';
 import { useChessRating } from '../games/chess/rating';
 import { useStore } from '../store/AppStore';
 
@@ -41,7 +42,7 @@ function NameEditor() {
   if (!editing)
     return (
       <div className="flex items-center gap-2">
-        <h1 className="font-display text-3xl font-bold">{data.username}</h1>
+        <h1 className="min-w-0 font-display text-3xl font-bold"><PlayerName name={data.username} avatar={data.avatar} /></h1>
         <button className="btn-ghost h-8 w-8 !p-0 text-sm" onClick={() => { setName(data.username); setEditing(true); }} aria-label="Edit username">✏️</button>
       </div>
     );
@@ -131,6 +132,7 @@ function AvatarShop() {
           {due > 0 ? <>Unlock &amp; equip for {due} <Coin /></> : 'Equip'}
         </button>
         <span className="flex items-center gap-1 text-sm text-muted">You have <Coin /> <b className="text-fg">{data.coins.toLocaleString()}</b></span>
+        <Link to="/shop" className="text-sm font-semibold text-neon-purple hover:underline">Frames, pets, effects &amp; more in the Shop →</Link>
       </div>
     </section>
   );
@@ -147,10 +149,10 @@ export default function Profile() {
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-8 sm:px-6">
       {/* header */}
-      <section className="card relative overflow-hidden p-6">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-neon-purple/15 via-transparent to-neon-blue/15" />
+      <section className="card relative overflow-hidden p-6" style={bannerStyle(data.avatar.bg)}>
+        <div className={`pointer-events-none absolute inset-0 ${data.avatar.bg ? 'bg-gradient-to-r from-bg/85 via-bg/55 to-bg/20' : 'bg-gradient-to-br from-neon-purple/15 via-transparent to-neon-blue/15'}`} />
         <div className="relative flex flex-col gap-5 sm:flex-row sm:items-center">
-          <AvatarBubble avatar={data.avatar} size={96} ring />
+          <div className="px-3 pt-4"><AvatarBubble avatar={data.avatar} size={96} ring /></div>
           <div className="min-w-0 flex-1">
             <NameEditor />
             <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted">

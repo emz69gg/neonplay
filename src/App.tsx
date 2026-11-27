@@ -9,6 +9,7 @@ const Browse = lazy(() => import('./pages/Browse'));
 const GamePage = lazy(() => import('./pages/GamePage'));
 const Leaderboard = lazy(() => import('./pages/Leaderboard'));
 const Profile = lazy(() => import('./pages/Profile'));
+const Shop = lazy(() => import('./pages/Shop'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 function Splash() {
@@ -36,6 +37,7 @@ function Shell() {
           <Route path="/game/:id" element={<GamePage />} />
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/shop" element={<Shop />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>

@@ -3,6 +3,10 @@
 @tailwind utilities;
 
 :root {
+  --neon-purple: 168 85 247;
+  --neon-blue: 59 130 246;
+  --neon-cyan: 34 211 238;
+  --neon-pink: 236 72 153;
   --bg: 244 244 250;
   --surface: 255 255 255;
   --surface-2: 236 236 246;
@@ -115,3 +119,23 @@
 @keyframes popdown { from { transform: translateY(0); } to { transform: translateY(100%); } }
 @keyframes aimshrink { from { transform: scale(1); } to { transform: scale(0); } }
 @keyframes pieceslide { from { transform: translate(var(--dx), var(--dy)); } to { transform: none; } }
+
+/* ---------------- Shop cosmetics ---------------- */
+@keyframes cos-spin { to { transform: rotate(360deg); } }
+@keyframes cos-spin-rev { to { transform: rotate(-360deg); } }
+@keyframes cos-flicker { 0%,100% { opacity: .85; filter: blur(2px) hue-rotate(0deg); } 50% { opacity: 1; filter: blur(3px) hue-rotate(25deg); } }
+@keyframes cos-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-18%); } }
+@keyframes cos-flap-l { 0%,100% { transform: rotate(8deg); } 50% { transform: rotate(-14deg); } }
+@keyframes cos-flap-r { 0%,100% { transform: scaleX(-1) rotate(8deg); } 50% { transform: scaleX(-1) rotate(-14deg); } }
+@keyframes cos-pulse { 0%,100% { opacity: .7; } 50% { opacity: 1; } }
+@keyframes cos-hop { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-35%); } }
+@keyframes cos-sway { 0%,100% { transform: rotate(-12deg); } 50% { transform: rotate(12deg); } }
+@keyframes cos-fade { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+@keyframes cos-hover { 0%,100% { transform: translate(0,0) rotate(-6deg); } 50% { transform: translate(0,-25%) rotate(6deg); } }
+@keyframes cos-orbit { from { transform: rotate(0deg) translateX(var(--r)) rotate(0deg); } to { transform: rotate(360deg) translateX(var(--r)) rotate(-360deg); } }
+@keyframes name-flow { to { background-position: 200% 0; } }
+@keyframes spin-glow { 0%,100% { box-shadow: 0 0 30px rgb(var(--neon-purple) / .5); } 50% { box-shadow: 0 0 55px rgb(var(--neon-pink) / .7); } }
+.name-grad { -webkit-background-clip: text; background-clip: text; color: transparent; background-size: 200% 100%; }
+.name-anim { animation: name-flow 3s linear infinite; }
+.reduce-motion [class*='cos-'], .reduce-motion .name-anim { animation: none !important; }
+.reduce-motion .cosfx, .reduce-motion .cosfx * { animation: none !important; }

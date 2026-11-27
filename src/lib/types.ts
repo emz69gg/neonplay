@@ -55,6 +55,20 @@ export interface FinishMeta {
 export interface Avatar {
   emoji: string;
   color: string; // gradient key
+  /** equipped cosmetics other players can see (keys from the shop catalog) */
+  frame?: string;
+  name?: string;
+  bg?: string;
+  badge?: string;
+  pet?: string;
+}
+
+/** Equipped effects only you see. */
+export interface Effects {
+  trail?: string;
+  win?: string;
+  coin?: string;
+  theme?: string;
 }
 
 export interface DailyState {
@@ -81,6 +95,10 @@ export interface UserData {
   unlocks: string[];
   daily: DailyState;
   login: { lastClaim: string | null; streak: number };
+  fx: Effects;
+  spin: { last: string | null };
+  /** highest level whose level-up coin bonus has been paid */
+  levelBonusPaid: number;
   createdAt: number;
   updatedAt: number;
 }

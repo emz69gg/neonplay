@@ -5,6 +5,7 @@ import { isCloud } from '../../lib/backend';
 import { useStore } from '../../store/AppStore';
 import type { GameApi } from '../../lib/types';
 import { BoardNav, ChessBoard, material, MoveList, PlayerBar, replay, type PlainMove } from './ChessBoard';
+import { PlayerName } from '../../components/Cosmetics';
 import { useChessRating } from './rating';
 import { cloneState, inCheck, kingSquare, legalMoves, make, outcome, positionKey, type Color, type Move } from './engine';
 import { getOnlineBackend, type GameResult, type OnlineBackend, type OnlineGame } from './online';
@@ -615,7 +616,7 @@ export default function ChessOnline({ api, initialJoin, onJoinHandled }: { api: 
       name={
         <span className="flex items-center gap-1.5">
           <AvatarBubble avatar={avatarOf(c)} size={22} />
-          {nameOf(c)}
+          <PlayerName name={nameOf(c)} avatar={avatarOf(c)} />
           {ratingOf(c) !== null && <span className="font-mono text-xs text-muted">({ratingOf(c)})</span>}
           {deltaOf(c) !== null && (
             <span className={`font-mono text-xs font-bold ${deltaOf(c)! > 0 ? 'text-emerald-500' : deltaOf(c)! < 0 ? 'text-rose-500' : 'text-muted'}`}>{fmtDelta(deltaOf(c)!)}</span>

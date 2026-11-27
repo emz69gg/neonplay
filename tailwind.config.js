@@ -12,7 +12,7 @@ export default {
         line: v('line'),
         fg: v('fg'),
         muted: v('muted'),
-        neon: { purple: '#a855f7', violet: '#8b5cf6', blue: '#3b82f6', cyan: '#22d3ee', pink: '#ec4899' },
+        neon: { purple: v('neon-purple'), violet: '#8b5cf6', blue: v('neon-blue'), cyan: v('neon-cyan'), pink: v('neon-pink') },
       },
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],

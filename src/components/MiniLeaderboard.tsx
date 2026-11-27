@@ -1,3 +1,4 @@
+import { PlayerName } from './Cosmetics';
 import { useEffect, useState } from 'react';
 import { gameLeaderboard, isCloud, type LeaderRow } from '../lib/backend';
 import { formatScore, GAME_MAP } from '../lib/games';
@@ -44,7 +45,7 @@ export default function MiniLeaderboard({ game, limit = 5 }: { game: GameId; lim
         <li key={r.id} className={`flex items-center gap-2.5 rounded-xl px-2 py-1.5 ${r.id === myId ? 'bg-neon-purple/15 ring-1 ring-neon-purple/40' : ''}`}>
           <span className={`w-6 text-center font-mono text-sm font-bold ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-slate-300' : i === 2 ? 'text-amber-600' : 'text-muted'}`}>{i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</span>
           <AvatarBubble avatar={r.avatar} size={28} />
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold">{r.username}</span>
+          <PlayerName name={r.username} avatar={r.avatar} className="min-w-0 flex-1 text-sm font-semibold" />
           <span className="font-mono text-sm font-bold">{formatScore(meta, r.value)}</span>
         </li>
       ))}

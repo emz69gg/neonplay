@@ -1,3 +1,4 @@
+import { itemsOfKind } from './cosmetics';
 import { GAMES, GAME_MAP, hashString, seededRandom, todayKey } from './games';
 import type { Avatar, FinishMeta, GameId, Reward, UserData } from './types';
 
@@ -21,38 +22,15 @@ export function rankTitle(level: number) {
 }
 
 /* ---------------- Avatars ---------------- */
-export const AVATAR_COLORS: Record<string, [string, string]> = {
-  violet: ['#a855f7', '#6366f1'],
-  ocean: ['#3b82f6', '#22d3ee'],
-  sunset: ['#f97316', '#ec4899'],
-  lime: ['#84cc16', '#10b981'],
-  gold: ['#eab308', '#f97316'],
-  ruby: ['#ef4444', '#a855f7'],
-  mono: ['#475569', '#1e293b'],
-};
-
+export { AVATAR_COLORS } from './cosmetics';
 export interface AvatarItem {
   emoji: string;
   cost: number;
 }
-export const AVATARS: AvatarItem[] = [
-  { emoji: '🎮', cost: 0 },
-  { emoji: '👾', cost: 0 },
-  { emoji: '🐱', cost: 0 },
-  { emoji: '🦊', cost: 0 },
-  { emoji: '🐸', cost: 0 },
-  { emoji: '🤖', cost: 0 },
-  { emoji: '🐼', cost: 150 },
-  { emoji: '🦄', cost: 250 },
-  { emoji: '🐙', cost: 250 },
-  { emoji: '🥷', cost: 400 },
-  { emoji: '🧙', cost: 400 },
-  { emoji: '👑', cost: 800 },
-  { emoji: '🐉', cost: 1200 },
-  { emoji: '💎', cost: 2000 },
-  { emoji: '🚀', cost: 3000 },
-];
-export const COLOR_COST: Record<string, number> = { violet: 0, ocean: 0, sunset: 0, lime: 100, gold: 300, ruby: 300, mono: 50 };
+export const AVATARS: AvatarItem[] = itemsOfKind('emoji').map((i) => ({ emoji: i.key, cost: i.price }));
+export const COLOR_COST: Record<string, number> = Object.fromEntries(itemsOfKind('color').map((i) => [i.key, i.price]));
+/** Coins paid for each level gained. */
+export const LEVEL_UP_COINS = 50;
 
 export const defaultAvatar = (): Avatar => ({ emoji: '🎮', color: 'violet' });
 
@@ -147,11 +125,11 @@ const scoreAtLeast = (id: string, game: GameId, target: number, title: string, i
 
 const CHALLENGE_POOL: Challenge[] = [
   {
-    id: 'distinct3', title: 'Play 3 different games', icon: '🎲', target: 3, reward: { xp: 80, coins: 60 },
+    id: 'distinct3', title: 'Play 3 different games', icon: '🎲', target: 3, reward: { xp: 80, coins: 150 },
     update: (_p, _e, d) => d.daily.gamesPlayed.length, label: (v) => `${Math.min(v, 3)} / 3`, done: (v) => v >= 3,
   },
   {
-    id: 'plays5', title: 'Finish 5 rounds of anything', icon: '🔁', target: 5, reward: { xp: 60, coins: 50 },
+    id: 'plays5', title: 'Finish 5 rounds of anything', icon: '🔁', target: 5, reward: { xp: 60, coins: 125 },
     update: (_p, _e, d) => d.daily.plays, label: (v) => `${Math.min(v, 5)} / 5`, done: (v) => v >= 5,
   },
   scoreAtLeast('snake15', 'snake', 15, 'Score 15 in Snake', '🐍', { xp: 90, coins: 60 }),
@@ -161,34 +139,34 @@ const CHALLENGE_POOL: Challenge[] = [
   scoreAtLeast('rps3', 'rps', 3, 'Get a 3-win streak in RPS', '✊', { xp: 70, coins: 50 }),
   scoreAtLeast('memory600', 'memory', 600, 'Score 600 in Memory Cards', '🃏', { xp: 80, coins: 50 }),
   {
-    id: 'reaction320', title: 'React in under 320 ms', icon: '⚡', game: 'reaction', target: 1, reward: { xp: 70, coins: 50 },
+    id: 'reaction320', title: 'React in under 320 ms', icon: '⚡', game: 'reaction', target: 1, reward: { xp: 70, coins: 125 },
     update: (p, e) => (e.game === 'reaction' && e.score < 320 ? 1 : p), label: (v) => (v ? 'Done' : 'Not yet'), done: (v) => v >= 1,
   },
   {
-    id: 'mine_win', title: 'Win a game of Minesweeper', icon: '🚩', game: 'minesweeper', target: 1, reward: { xp: 110, coins: 70 },
+    id: 'mine_win', title: 'Win a game of Minesweeper', icon: '🚩', game: 'minesweeper', target: 1, reward: { xp: 110, coins: 175 },
     update: (p, e) => (e.game === 'minesweeper' && e.meta?.win ? 1 : p), label: (v) => (v ? 'Done' : 'Not yet'), done: (v) => v >= 1,
   },
   {
-    id: 'ttt_ai', title: 'Beat or draw the AI in Tic Tac Toe', icon: '❌', game: 'tictactoe', target: 1, reward: { xp: 60, coins: 40 },
+    id: 'ttt_ai', title: 'Beat or draw the AI in Tic Tac Toe', icon: '❌', game: 'tictactoe', target: 1, reward: { xp: 60, coins: 100 },
     update: (p, e) => (e.game === 'tictactoe' && e.meta?.vsAi && (e.meta.win || e.meta.draw) ? 1 : p), label: (v) => (v ? 'Done' : 'Not yet'), done: (v) => v >= 1,
   },
   scoreAtLeast('bricks1000', 'bricks', 1000, 'Score 1,000 in Brick Breaker', '🧱', { xp: 90, coins: 60 }),
   scoreAtLeast('stack2000', 'blockstack', 2000, 'Score 2,000 in Block Stack', '🟦', { xp: 90, coins: 60 }),
   {
-    id: 'word_solve', title: 'Solve a Word Guess puzzle', icon: '🔤', game: 'wordguess', target: 1, reward: { xp: 80, coins: 50 },
+    id: 'word_solve', title: 'Solve a Word Guess puzzle', icon: '🔤', game: 'wordguess', target: 1, reward: { xp: 80, coins: 125 },
     update: (p, e) => (e.game === 'wordguess' && e.meta?.win ? 1 : p), label: (v) => (v ? 'Done' : 'Not yet'), done: (v) => v >= 1,
   },
   {
-    id: 'c4_ai', title: 'Beat the AI in Connect Four', icon: '🔴', game: 'connect4', target: 1, reward: { xp: 80, coins: 50 },
+    id: 'c4_ai', title: 'Beat the AI in Connect Four', icon: '🔴', game: 'connect4', target: 1, reward: { xp: 80, coins: 125 },
     update: (p, e) => (e.game === 'connect4' && e.meta?.vsAi && e.meta.win ? 1 : p), label: (v) => (v ? 'Done' : 'Not yet'), done: (v) => v >= 1,
   },
   {
-    id: 'chess_ai', title: 'Win a game of chess vs a bot', icon: '♞', game: 'chess', target: 1, reward: { xp: 90, coins: 60 },
+    id: 'chess_ai', title: 'Win a game of chess vs a bot', icon: '♞', game: 'chess', target: 1, reward: { xp: 90, coins: 150 },
     update: (p, e) => (e.game === 'chess' && e.meta?.vsAi && e.meta.win ? 1 : p), label: (v) => (v ? 'Done' : 'Not yet'), done: (v) => v >= 1,
   },
   scoreAtLeast('whack25', 'whack', 25, 'Score 25 in Whack-a-Mole', '🔨', { xp: 70, coins: 50 }),
   {
-    id: 'aim500', title: 'Average under 500 ms in Aim Trainer', icon: '🎯', game: 'aim', target: 1, reward: { xp: 80, coins: 50 },
+    id: 'aim500', title: 'Average under 500 ms in Aim Trainer', icon: '🎯', game: 'aim', target: 1, reward: { xp: 80, coins: 125 },
     update: (p, e) => (e.game === 'aim' && e.meta?.mode === 'speed' && e.score < 500 ? 1 : p), label: (v) => (v ? 'Done' : 'Not yet'), done: (v) => v >= 1,
   },
 ];
@@ -210,13 +188,13 @@ export function dailyChallenges(date = todayKey()): Challenge[] {
 
 /* ---------------- Daily login ---------------- */
 export const LOGIN_REWARDS: Reward[] = [
-  { coins: 50, xp: 20 },
-  { coins: 75, xp: 30 },
-  { coins: 100, xp: 40 },
-  { coins: 125, xp: 50 },
-  { coins: 150, xp: 60 },
-  { coins: 200, xp: 80 },
-  { coins: 350, xp: 150 },
+  { coins: 100, xp: 20 },
+  { coins: 125, xp: 30 },
+  { coins: 150, xp: 40 },
+  { coins: 175, xp: 50 },
+  { coins: 200, xp: 60 },
+  { coins: 250, xp: 80 },
+  { coins: 500, xp: 150 },
 ];
 
 export function yesterdayKey() {
@@ -256,6 +234,9 @@ export function newUserData(username = 'Guest'): UserData {
     unlocks: [],
     daily: freshDaily(),
     login: { lastClaim: null, streak: 0 },
+    fx: {},
+    spin: { last: null },
+    levelBonusPaid: 1,
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
@@ -278,6 +259,10 @@ export function normalizeUserData(raw: unknown, fallbackName = 'Guest'): UserDat
     saves: { ...(r.saves ?? {}) },
     unlocks: [...(r.unlocks ?? [])],
     login: { ...base.login, ...(r.login ?? {}) },
+    fx: { ...(r.fx ?? {}) },
+    spin: { ...base.spin, ...(r.spin ?? {}) },
+    // older saves: don't pay level-up bonuses retroactively
+    levelBonusPaid: typeof r.levelBonusPaid === 'number' ? r.levelBonusPaid : levelFromXp(r.xp ?? 0),
     daily: r.daily && r.daily.date === todayKey() ? { ...freshDaily(), ...r.daily } : freshDaily(),
   };
   return data;
@@ -300,5 +285,6 @@ export function mergeProgress(account: UserData, guest: UserData): UserData {
   out.favorites = Array.from(new Set([...account.favorites, ...guest.favorites]));
   out.recent = Array.from(new Set([...guest.recent, ...account.recent])).slice(0, 12);
   out.unlocks = Array.from(new Set([...account.unlocks, ...guest.unlocks]));
+  out.levelBonusPaid = Math.max(account.levelBonusPaid, guest.levelBonusPaid);
   return out;
 }

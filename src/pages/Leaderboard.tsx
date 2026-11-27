@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import GameThumb from '../components/GameThumb';
+import { PlayerName } from '../components/Cosmetics';
 import { AvatarBubble, EmptyState, Spinner } from '../components/ui';
 import { chessEloLeaderboard, gameLeaderboard, isCloud, xpLeaderboard, type EloRow, type LeaderRow } from '../lib/backend';
 import { formatScore, GAME_MAP, GAMES, isGameId } from '../lib/games';
@@ -100,7 +101,7 @@ export default function Leaderboard() {
                   <div key={r.id} className={`card relative flex flex-col items-center text-center ${h} ${idx === 0 ? 'border-yellow-400/50 shadow-[0_0_40px_-10px_rgba(250,204,21,.5)]' : ''} ${r.id === myId ? 'ring-2 ring-neon-purple' : ''} animate-fade-up`}>
                     <span className="absolute -top-4 text-3xl">{medal}</span>
                     <AvatarBubble avatar={r.avatar} size={idx === 0 ? 64 : 52} />
-                    <div className="mt-2 max-w-full truncate px-2 font-bold">{r.username}</div>
+                    <div className="mt-3 max-w-full px-2 font-bold"><PlayerName name={r.username} avatar={r.avatar} /></div>
                     <div className="font-mono text-sm font-bold text-neon-purple">{fmt(r.value)}</div>
                   </div>
                 );
@@ -126,7 +127,7 @@ export default function Leaderboard() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           <AvatarBubble avatar={r.avatar} size={32} />
-                          <span className="font-semibold">{r.username}</span>
+                          <PlayerName name={r.username} avatar={r.avatar} className="font-semibold" />
                           {r.id === myId && <span className="chip !py-0 !text-[10px]">YOU</span>}
                         </div>
                       </td>
