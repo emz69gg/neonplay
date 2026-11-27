@@ -381,6 +381,60 @@ export async function xpLeaderboard(limit = 50): Promise<LeaderRow[]> {
     .slice(0, limit);
 }
 
+/* ---------------- Chess ratings (online play) ---------------- */
+export interface ChessRating {
+  rating: number;
+  peak: number;
+  games: number;
+  wins: number;
+  losses: number;
+  draws: number;
+}
+export interface EloRow extends ChessRating {
+  id: string;
+  username: string;
+  avatar: Avatar;
+}
+const ratingFrom = (r: Record<string, number | null | undefined>): ChessRating => ({
+  rating: r.chess_rating ?? 1200,
+  peak: r.chess_peak ?? 1200,
+  games: r.chess_games ?? 0,
+  wins: r.chess_wins ?? 0,
+  losses: r.chess_losses ?? 0,
+  draws: r.chess_draws ?? 0,
+});
+
+/** The signed-in player's online chess rating (null if unavailable). */
+export async function chessRatingOf(userId: string): Promise<ChessRating | null> {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('chess_rating, chess_peak, chess_games, chess_wins, chess_losses, chess_draws')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error || !data) return null;
+    return ratingFrom(data);
+  } catch {
+    return null;
+  }
+}
+
+export async function chessEloLeaderboard(limit = 50): Promise<EloRow[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, username, avatar, chess_rating, chess_peak, chess_games, chess_wins, chess_losses, chess_draws')
+    .gt('chess_games', 0)
+    .order('chess_rating', { ascending: false })
+    .limit(limit);
+  if (error) {
+    if (/chess_rating|column/i.test(error.message)) throw new Error('Chess ratings aren’t set up on the server yet (run supabase/schema.sql).');
+    throw new Error(error.message);
+  }
+  return (data ?? []).map((r) => ({ id: r.id, username: r.username, avatar: r.avatar ?? newUserData().avatar, ...ratingFrom(r) }));
+}
+
 export function clearAllLocalData() {
   Object.keys(localStorage)
     .filter((k) => k.startsWith('neonplay:'))

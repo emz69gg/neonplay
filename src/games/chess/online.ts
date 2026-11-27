@@ -29,6 +29,11 @@ export interface OnlineGame {
   updated_at: string;
   rematch_id?: string | null;
   rematch_by?: 'w' | 'b' | null;
+  rated?: boolean;
+  white_rating?: number | null;
+  black_rating?: number | null;
+  white_delta?: number | null;
+  black_delta?: number | null;
 }
 
 export type GameResult = { reason: 'checkmate' | 'stalemate' | 'insufficient' | 'fifty' | 'repetition' };

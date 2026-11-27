@@ -178,7 +178,7 @@ export interface SearchResult {
 }
 
 /** Iterative deepening search. Returns the best move found before the deadline. */
-export function search(root: State, maxDepth: number, budgetMs: number): SearchResult {
+export function search(root: State, maxDepth: number, budgetMs: number, rootScores?: Map<Move, number>): SearchResult {
   const s: State = { ...root, board: [...root.board], castling: { ...root.castling } };
   const ctx: Ctx = { deadline: performance.now() + budgetMs, nodes: 0, killers: [] };
   const moves = legalMoves(s);
@@ -190,14 +190,21 @@ export function search(root: State, maxDepth: number, budgetMs: number): SearchR
     try {
       let alpha = -Infinity;
       let iterBest: Move = best;
+      const iterScores = new Map<Move, number>();
       for (const m of order(moves, ctx, 0, best)) {
         const u = make(s, m);
-        const v = -negamax(s, depth - 1, -Infinity, -alpha, 1, ctx);
+        // with rootScores we need every root move's real score, so no alpha narrowing at the root
+        const v = -negamax(s, depth - 1, -Infinity, rootScores ? Infinity : -alpha, 1, ctx);
         unmake(s, m, u);
+        iterScores.set(m, v);
         if (v > alpha) {
           alpha = v;
           iterBest = m;
         }
+      }
+      if (rootScores) {
+        rootScores.clear();
+        iterScores.forEach((v, m) => rootScores.set(m, v));
       }
       best = iterBest;
       bestScore = alpha;
@@ -212,6 +219,69 @@ export function search(root: State, maxDepth: number, budgetMs: number): SearchR
 }
 
 export type Level = 'easy' | 'medium' | 'hard';
+
+/* ---------------- Practice bots, each tuned to play around an Elo rating ---------------- */
+export type BotId = 'pawny' | 'rookie' | 'novice' | 'clubber' | 'tactician' | 'expert' | 'master';
+export interface Bot {
+  id: BotId;
+  name: string;
+  elo: number;
+  emoji: string;
+  blurb: string;
+  /** used for achievements / rewards */
+  tier: Level;
+  depth: number;
+  ms: number;
+  /** chance of playing a completely random move */
+  blunder: number;
+  /** random noise (centipawns) added to each move's score */
+  noise: number;
+}
+export const BOTS: Bot[] = [
+  { id: 'pawny', name: 'Pawny', elo: 400, emoji: '🐣', blurb: 'Just learned how the pieces move.', tier: 'easy', depth: 1, ms: 200, blunder: 0.45, noise: 260 },
+  { id: 'rookie', name: 'Rookie', elo: 700, emoji: '🙂', blurb: 'Grabs pieces, often leaves its own hanging.', tier: 'easy', depth: 1, ms: 200, blunder: 0.22, noise: 150 },
+  { id: 'novice', name: 'Novice', elo: 900, emoji: '🤓', blurb: 'Sees one move ahead. Still blunders.', tier: 'easy', depth: 2, ms: 300, blunder: 0.1, noise: 90 },
+  { id: 'clubber', name: 'Clubber', elo: 1200, emoji: '😎', blurb: 'A solid club player. Punishes loose pieces.', tier: 'medium', depth: 2, ms: 450, blunder: 0.03, noise: 45 },
+  { id: 'tactician', name: 'Tactician', elo: 1500, emoji: '🦊', blurb: 'Loves forks, pins and cheap tricks.', tier: 'medium', depth: 3, ms: 700, blunder: 0.01, noise: 22 },
+  { id: 'expert', name: 'Expert', elo: 1800, emoji: '🧠', blurb: 'Calculates deep. Rarely makes mistakes.', tier: 'hard', depth: 5, ms: 1300, blunder: 0, noise: 8 },
+  { id: 'master', name: 'Master', elo: 2100, emoji: '👑', blurb: 'Full strength. Bring your best game.', tier: 'hard', depth: 8, ms: 2200, blunder: 0, noise: 0 },
+];
+export const botById = (id: string | undefined): Bot => BOTS.find((b) => b.id === id) ?? BOTS[3];
+/** The bot whose rating is closest to (and preferably just above) a player's rating. */
+export function suggestedBot(rating: number): Bot {
+  return BOTS.reduce((best, b) => (Math.abs(b.elo - (rating + 100)) < Math.abs(best.elo - (rating + 100)) ? b : best), BOTS[0]);
+}
+
+const gauss = () => {
+  let u = 0;
+  let v = 0;
+  while (!u) u = Math.random();
+  while (!v) v = Math.random();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+};
+
+/** Pick a move the way a player of this bot's rating might. */
+export function botMove(s: State, bot: Bot): Move | null {
+  const moves = legalMoves(s);
+  if (!moves.length) return null;
+  if (moves.length === 1) return moves[0];
+  if (bot.noise === 0) return search(s, bot.depth, bot.ms).move;
+  if (Math.random() < bot.blunder) return moves[Math.floor(Math.random() * moves.length)];
+  const scores = new Map<Move, number>();
+  const res = search(s, bot.depth, bot.ms, scores);
+  if (!scores.size) return res.move;
+  let best: Move | null = null;
+  let bestV = -Infinity;
+  scores.forEach((v, m) => {
+    // never miss a forced mate in its favour, otherwise add human-like noise
+    const noisy = v > MATE - 1000 ? v : v + gauss() * bot.noise;
+    if (noisy > bestV) {
+      bestV = noisy;
+      best = m;
+    }
+  });
+  return best ?? res.move;
+}
 
 /** Pick a move for the given difficulty. */
 export function chooseMove(s: State, level: Level): Move | null {

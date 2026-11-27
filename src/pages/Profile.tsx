@@ -7,7 +7,31 @@ import { AvatarBubble, Coin, EmptyState, XPBar } from '../components/ui';
 import { isCloud } from '../lib/backend';
 import { formatScore, GAME_MAP, GAMES } from '../lib/games';
 import { ACHIEVEMENTS, AVATAR_COLORS, AVATARS, COLOR_COST, levelFromXp, rankTitle } from '../lib/progression';
+import { useChessRating } from '../games/chess/rating';
 import { useStore } from '../store/AppStore';
+
+function ChessRatingCard() {
+  const r = useChessRating();
+  if (!r) return null;
+  return (
+    <section className="card p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="font-display text-lg font-bold">♞ Chess rating</h2>
+        <Link to="/leaderboard?board=elo" className="text-xs font-semibold text-neon-purple hover:underline">Elo leaderboard →</Link>
+      </div>
+      <div className="mt-2 flex items-end gap-3">
+        <span className="font-mono text-4xl font-bold text-neon-purple">{r.rating}</span>
+        <span className="pb-1 text-sm text-muted">{r.games ? `peak ${r.peak}` : 'provisional — play a rated quick match'}</span>
+      </div>
+      {r.games > 0 && (
+        <div className="mt-2 text-sm">
+          {r.games} rated games · <span className="text-emerald-500">{r.wins}W</span> <span className="text-rose-500">{r.losses}L</span> {r.draws}D
+        </div>
+      )}
+      <Link to="/game/chess" className="btn-ghost mt-3 w-full !py-2 text-sm">Play or train with bots</Link>
+    </section>
+  );
+}
 
 function NameEditor() {
   const { data, setUsername } = useStore();
@@ -192,6 +216,7 @@ export default function Profile() {
           </ul>
         </section>
         <div className="space-y-6">
+          <ChessRatingCard />
           <DailyChallengesPanel />
           <AvatarShop />
         </div>

@@ -1,9 +1,10 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Spinner } from '../components/ui';
-import { chooseMove, type Level } from './chess/ai';
+import { BOTS, botById, botMove, suggestedBot, type BotId } from './chess/ai';
 import { BoardNav, ChessBoard, material, MoveList, PlayerBar, replay, type PlainMove } from './chess/ChessBoard';
 import { fromFen, inCheck, kingSquare, legalMoves, outcome, toFen, type Color, type Move, type Outcome } from './chess/engine';
+import { useChessRating } from './chess/rating';
 import type { GameProps } from './shared';
 
 /* Chess — full rules; vs AI (web worker), vs a friend on this device, or online vs real players. */
@@ -13,7 +14,9 @@ const ChessOnline = lazy(() => import('./chess/ChessOnline'));
 type Mode = 'ai' | 'pvp' | 'online';
 interface Save {
   mode: Mode;
-  level: Level;
+  bot: BotId;
+  /** bots you have beaten at least once */
+  beaten: BotId[];
   human: Color;
   moves: PlainMove[];
   resigned: Color | null;
@@ -52,11 +55,14 @@ function getWorker(): Worker | null {
 export default function Chess({ api, fresh }: GameProps) {
   const [params, setParams] = useSearchParams();
   const joinCode = params.get('join');
-  const loaded = api.load<Save>();
+  const loaded = api.load<Save & { level?: string }>();
+  // older saves stored a difficulty level instead of a bot
+  const legacyBot: Record<string, BotId> = { easy: 'rookie', medium: 'clubber', hard: 'expert' };
   const [g, setG] = useState<Save>(() => ({
     // jump back into an online game that's still running
     mode: joinCode || hasActiveOnlineGame() ? 'online' : loaded?.mode ?? 'ai',
-    level: loaded?.level ?? 'medium',
+    bot: loaded?.bot ?? legacyBot[loaded?.level ?? ''] ?? 'clubber',
+    beaten: loaded?.beaten ?? [],
     human: loaded?.human ?? 'w',
     moves: fresh ? [] : loaded?.moves ?? [],
     resigned: fresh ? null : loaded?.resigned ?? null,
@@ -66,6 +72,10 @@ export default function Chess({ api, fresh }: GameProps) {
   const [thinking, setThinking] = useState(false);
   const [flipManual, setFlipManual] = useState(false);
   const reqId = useRef(0);
+  const bot = botById(g.bot);
+  const rating = useChessRating();
+  const nextUnbeaten = BOTS.find((b) => !g.beaten.includes(b.id)) ?? BOTS[BOTS.length - 1];
+  const recommended = rating && rating.games > 0 ? suggestedBot(rating.rating) : nextUnbeaten;
 
   const { state, sans, keys, applied, positions } = useMemo(() => replay(g.moves), [g.moves]);
   const [view, setView] = useState<number | null>(null); // reviewing an earlier position
@@ -124,13 +134,13 @@ export default function Chess({ api, fresh }: GameProps) {
         }
       };
       w.addEventListener('message', onMsg);
-      w.postMessage({ id, fen, level: g.level });
+      w.postMessage({ id, fen, bot: g.bot });
       return () => w.removeEventListener('message', onMsg);
     }
-    const t = window.setTimeout(() => deliver(chooseMove(fromFen(fen), g.level)), 30);
+    const t = window.setTimeout(() => deliver(botMove(fromFen(fen), bot)), 30);
     return () => window.clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [g.moves.length, g.mode, g.human, g.level, result.over]);
+  }, [g.moves.length, g.mode, g.human, g.bot, result.over]);
 
   // local game over → report once
   useEffect(() => {
@@ -140,10 +150,10 @@ export default function Chess({ api, fresh }: GameProps) {
       const win = result.winner === g.human;
       const lose = result.winner !== null && !win;
       const streak = win ? g.streak + 1 : lose ? 0 : g.streak;
-      setG((p) => ({ ...p, reported: true, streak }));
+      setG((p) => ({ ...p, reported: true, streak, beaten: win && !p.beaten.includes(p.bot) ? [...p.beaten, p.bot] : p.beaten }));
       api.setScore(streak);
       api.sound(win ? 'win' : lose ? 'lose' : 'flip');
-      api.finish(streak, { win, draw: result.winner === null, difficulty: g.level, vsAi: true, moves: moveCount, reason: result.reason });
+      api.finish(streak, { win, draw: result.winner === null, difficulty: bot.tier, bot: bot.id, botElo: bot.elo, vsAi: true, moves: moveCount, reason: result.reason });
     } else {
       setG((p) => ({ ...p, reported: true }));
       api.sound('win');
@@ -192,14 +202,17 @@ export default function Chess({ api, fresh }: GameProps) {
 
   const shown = view === null ? state : positions[view];
   const mat = useMemo(() => material(shown), [shown]);
-  const names: Record<Color, string> = g.mode === 'ai' ? (g.human === 'w' ? { w: 'You', b: 'AI' } : { w: 'AI', b: 'You' }) : { w: 'White', b: 'Black' };
+  const botName = `${bot.emoji} ${bot.name}`;
+  const youName = rating && rating.games > 0 ? `You (${rating.rating})` : 'You';
+  const names: Record<Color, string> = g.mode === 'ai' ? (g.human === 'w' ? { w: youName, b: botName } : { w: botName, b: youName }) : { w: 'White', b: 'Black' };
+  const isBot = (c: Color) => g.mode === 'ai' && c !== g.human;
 
   let status: string;
   if (result.over) {
     if (result.winner === null) status = REASON[result.reason];
-    else if (g.mode === 'ai') status = `${REASON[result.reason]} — ${result.winner === g.human ? 'you win! 🎉' : 'AI wins 🤖'}`;
+    else if (g.mode === 'ai') status = `${REASON[result.reason]} — ${result.winner === g.human ? `you beat ${bot.name}! 🎉` : `${bot.name} wins ${bot.emoji}`}`;
     else status = `${REASON[result.reason]} — ${result.winner === 'w' ? 'White' : 'Black'} wins! 🎉`;
-  } else if (thinking) status = 'AI is thinking…';
+  } else if (thinking) status = `${bot.name} is thinking…`;
   else if (g.mode === 'ai') status = check ? 'Check! Your move' : 'Your move';
   else status = `${turn === 'w' ? 'White' : 'Black'} to move${check ? ' — check!' : ''}`;
 
@@ -210,8 +223,8 @@ export default function Chess({ api, fresh }: GameProps) {
       active={!result.over && turn === c}
       captured={c === 'w' ? mat.byWhite : mat.byBlack}
       advantage={c === 'w' ? mat.diff : -mat.diff}
-      badge={g.mode === 'ai' && names[c] === 'AI' ? <span className="chip !py-0 !text-[10px] capitalize">{g.level}</span> : undefined}
-      right={thinking && names[c] === 'AI' ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-neon-purple" /> : undefined}
+      badge={isBot(c) ? <span className="chip !py-0 !text-[10px]">{bot.elo}</span> : undefined}
+      right={thinking && isBot(c) ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-neon-purple" /> : undefined}
     />
   );
 
@@ -219,7 +232,7 @@ export default function Chess({ api, fresh }: GameProps) {
     <div className="grid grid-cols-3 rounded-xl bg-surface2 p-1 text-sm font-semibold">
       {(['ai', 'pvp', 'online'] as Mode[]).map((m) => (
         <button key={m} onClick={() => setMode(m)} className={`rounded-lg px-2 py-1.5 transition ${g.mode === m ? 'bg-surface shadow' : 'text-muted'}`}>
-          {m === 'ai' ? '🤖 vs AI' : m === 'pvp' ? '👥 Same device' : '🌐 Online'}
+          {m === 'ai' ? '🤖 vs Bots' : m === 'pvp' ? '👥 Same device' : '🌐 Online'}
         </button>
       ))}
     </div>
@@ -270,7 +283,7 @@ export default function Chess({ api, fresh }: GameProps) {
       <div className="flex min-w-0 flex-col gap-3">
         <div className={`card p-4 ${result.over ? 'border-neon-purple/50' : ''}`}>
           <div className="font-display text-lg font-bold" aria-live="polite">{status}</div>
-          {g.mode === 'ai' && <div className="mt-1 text-sm text-muted">🔥 Win streak vs AI: <b className="text-fg">{g.streak}</b></div>}
+          {g.mode === 'ai' && <div className="mt-1 text-sm text-muted">🔥 Win streak vs bots: <b className="text-fg">{g.streak}</b></div>}
           <div className="mt-3 flex flex-wrap gap-2">
             {result.over ? (
               <button className="btn-primary animate-pop" onClick={() => newGame()}>New game</button>
@@ -288,12 +301,38 @@ export default function Chess({ api, fresh }: GameProps) {
           {modeTabs}
           {g.mode === 'ai' && (
             <>
-              <div className="grid grid-cols-3 rounded-xl bg-surface2 p-1 text-sm font-semibold">
-                {(['easy', 'medium', 'hard'] as Level[]).map((l) => (
-                  <button key={l} onClick={() => newGame({ level: l })} className={`rounded-lg px-2 py-1.5 capitalize transition ${g.level === l ? 'bg-surface shadow' : 'text-muted'}`}>
-                    {l}
-                  </button>
-                ))}
+              <div>
+                <div className="mb-1.5 flex items-baseline justify-between text-xs text-muted">
+                  <span className="font-semibold uppercase tracking-wide">Practice bots</span>
+                  <span>{rating && rating.games > 0 ? <>Your rating: <b className="text-fg">{rating.rating}</b></> : `${g.beaten.length}/${BOTS.length} beaten`}</span>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-7 lg:grid-cols-4" role="radiogroup" aria-label="Choose a bot">
+                  {BOTS.map((b) => (
+                    <button
+                      key={b.id}
+                      role="radio"
+                      aria-checked={g.bot === b.id}
+                      title={`${b.name} (${b.elo}) — ${b.blurb}`}
+                      onClick={() => newGame({ bot: b.id })}
+                      className={`relative flex flex-col items-center rounded-xl border px-1 py-1.5 text-center transition ${g.bot === b.id ? 'border-neon-purple bg-neon-purple/10 shadow' : 'border-line bg-surface2 hover:border-neon-purple/50'}`}
+                    >
+                      {g.beaten.includes(b.id) && <span className="absolute right-1 top-0.5 text-[10px] text-emerald-500" aria-label="beaten">✓</span>}
+                      <span className="text-xl leading-none">{b.emoji}</span>
+                      <span className="mt-0.5 text-[11px] font-semibold leading-tight">{b.name}</span>
+                      <span className="text-[10px] text-muted">{b.elo}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-2 rounded-xl bg-surface2 px-3 py-2 text-xs">
+                  <b>{bot.emoji} {bot.name} · {bot.elo}</b> — <span className="text-muted">{bot.blurb}</span>
+                  {recommended.id !== bot.id ? (
+                    <button className="mt-1 block font-semibold text-neon-purple hover:underline" onClick={() => newGame({ bot: recommended.id })}>
+                      {rating && rating.games > 0 ? `Recommended for your ${rating.rating} rating` : 'Next challenge'}: {recommended.emoji} {recommended.name} ({recommended.elo}) →
+                    </button>
+                  ) : (
+                    <span className="mt-1 block font-semibold text-emerald-500">{rating && rating.games > 0 ? '✓ A good match for your rating' : '✓ Your next challenge'}</span>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-2 rounded-xl bg-surface2 p-1 text-sm font-semibold">
                 {(['w', 'b'] as Color[]).map((c) => (
@@ -307,7 +346,7 @@ export default function Chess({ api, fresh }: GameProps) {
           <p className="text-xs text-muted">Changing these starts a new game. Want a real opponent? Try 🌐 Online.</p>
         </div>
 
-        <MoveList sans={sans} viewing={view} onSelect={(ply) => setView(ply >= sans.length ? null : ply)} emptyText={g.mode === 'ai' && g.human === 'b' ? 'The AI plays first.' : 'White moves first.'} />
+        <MoveList sans={sans} viewing={view} onSelect={(ply) => setView(ply >= sans.length ? null : ply)} emptyText={g.mode === 'ai' && g.human === 'b' ? `${bot.name} plays first.` : 'White moves first.'} />
         <p className="text-center text-xs text-muted">Click or tap a piece, then a square — or drag it. Your game is saved automatically.</p>
       </div>
     </div>

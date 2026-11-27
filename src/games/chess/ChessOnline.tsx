@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { AvatarBubble } from '../../components/ui';
 import { isCloud } from '../../lib/backend';
 import { useStore } from '../../store/AppStore';
 import type { GameApi } from '../../lib/types';
 import { BoardNav, ChessBoard, material, MoveList, PlayerBar, replay, type PlainMove } from './ChessBoard';
+import { useChessRating } from './rating';
 import { cloneState, inCheck, kingSquare, legalMoves, make, outcome, positionKey, type Color, type Move } from './engine';
 import { getOnlineBackend, type GameResult, type OnlineBackend, type OnlineGame } from './online';
 
@@ -106,6 +108,8 @@ export default function ChessOnline({ api, initialJoin, onJoinHandled }: { api: 
   const failures = useRef(0);
   const gameRef = useRef<OnlineGame | null>(null);
   gameRef.current = game;
+  // re-read the rating whenever a game finishes
+  const rating = useChessRating(game?.status === 'finished' ? game.id : 0);
 
   const mockMode = import.meta.env.DEV && store.get('neonplay:mockOnline') === '1';
   const loggedIn = mockMode || user?.provider === 'supabase';
@@ -463,6 +467,17 @@ export default function ChessOnline({ api, initialJoin, onJoinHandled }: { api: 
             <h3 className="font-display text-xl font-bold">🌐 Play online</h3>
             <p className="text-sm text-muted">Real opponents, live moves, chess clocks.</p>
           </div>
+          {rating && (
+            <Link to="/leaderboard?board=elo" className="flex items-center justify-between rounded-xl bg-surface2 px-3 py-2 text-sm transition hover:bg-line/60">
+              <span>
+                ♞ Your rating <b className="ml-1 font-mono text-lg text-neon-purple">{rating.rating}</b>
+                {rating.games === 0 && <span className="ml-1 text-xs text-muted">(provisional)</span>}
+              </span>
+              <span className="text-xs text-muted">
+                {rating.games ? `${rating.wins}W ${rating.losses}L ${rating.draws}D · peak ${rating.peak}` : 'Play a quick match to get rated'} →
+              </span>
+            </Link>
+          )}
           <div>
             <div className="mb-1.5 text-xs font-bold uppercase tracking-wider text-muted">Time per player</div>
             <div className="grid grid-cols-3 rounded-xl bg-surface2 p-1 text-sm font-semibold">
@@ -474,9 +489,9 @@ export default function ChessOnline({ api, initialJoin, onJoinHandled }: { api: 
             </div>
           </div>
           <button className="btn-primary w-full !py-3 !text-base" disabled={busy} onClick={() => quickMatch()}>
-            {busy ? 'Please wait…' : '⚔️ Find an opponent'}
+            {busy ? 'Please wait…' : '⚔️ Find an opponent'} <span className="text-xs font-normal opacity-80">· rated</span>
           </button>
-          <button className="btn-ghost w-full" disabled={busy} onClick={invite}>🔗 Invite a friend</button>
+          <button className="btn-ghost w-full" disabled={busy} onClick={invite}>🔗 Invite a friend <span className="text-xs font-normal text-muted">· friendly</span></button>
           <form
             className="flex gap-2"
             onSubmit={(e) => {
@@ -517,7 +532,7 @@ export default function ChessOnline({ api, initialJoin, onJoinHandled }: { api: 
               })}
             </ul>
           )}
-          <p className="mt-4 text-xs text-muted">Wins give XP and coins. Leaving a game doesn’t pause your clock.</p>
+          <p className="mt-4 text-xs text-muted">Quick matches pair you with someone close to your rating and change your Elo. Games with fewer than 2 moves don’t count. Wins give XP and coins. Leaving a game doesn’t pause your clock.</p>
         </div>
       </div>
     );
@@ -570,6 +585,10 @@ export default function ChessOnline({ api, initialJoin, onJoinHandled }: { api: 
   const topColor: Color = flipped ? 'w' : 'b';
   const bottomColor: Color = flipped ? 'b' : 'w';
   const nameOf = (c: Color) => (c === 'w' ? game.white_name : game.black_name) ?? 'Player';
+  const ratingOf = (c: Color) => (c === 'w' ? game.white_rating : game.black_rating) ?? null;
+  const deltaOf = (c: Color) => (c === 'w' ? game.white_delta : game.black_delta) ?? null;
+  const rated = game.rated !== false;
+  const fmtDelta = (d: number) => (d > 0 ? `+${d}` : d < 0 ? `−${-d}` : '±0');
   const avatarOf = (c: Color) => (c === 'w' ? game.white_avatar : game.black_avatar) ?? { emoji: '🎮', color: 'violet' };
   const check = active && inCheck(state);
   const mateKing = game.status === 'finished' && game.result_reason === 'checkmate';
@@ -597,6 +616,10 @@ export default function ChessOnline({ api, initialJoin, onJoinHandled }: { api: 
         <span className="flex items-center gap-1.5">
           <AvatarBubble avatar={avatarOf(c)} size={22} />
           {nameOf(c)}
+          {ratingOf(c) !== null && <span className="font-mono text-xs text-muted">({ratingOf(c)})</span>}
+          {deltaOf(c) !== null && (
+            <span className={`font-mono text-xs font-bold ${deltaOf(c)! > 0 ? 'text-emerald-500' : deltaOf(c)! < 0 ? 'text-rose-500' : 'text-muted'}`}>{fmtDelta(deltaOf(c)!)}</span>
+          )}
           {c === myColor && <span className="text-xs font-semibold text-muted">(you)</span>}
         </span>
       }
@@ -650,9 +673,21 @@ export default function ChessOnline({ api, initialJoin, onJoinHandled }: { api: 
         <div className={`card p-4 ${game.status === 'finished' ? 'border-neon-purple/50' : ''}`}>
           <div className="font-display text-lg font-bold" aria-live="polite">{statusText}</div>
           <div className="mt-1 text-xs text-muted">
-            Online · {game.time_ms / 60000} min · game {game.code}
+            Online · {rated ? 'Rated' : 'Friendly'} · {game.time_ms / 60000} min · game {game.code}
             {active && <> · {live ? '🟢 live' : '🟡 syncing'}</>}
           </div>
+          {game.status === 'finished' && rated && myColor && (
+            <div className="mt-2 text-sm">
+              {deltaOf(myColor) !== null ? (
+                <>
+                  Rating: <b className="font-mono">{(ratingOf(myColor) ?? 1200) + deltaOf(myColor)!}</b>{' '}
+                  <span className={`font-mono font-bold ${deltaOf(myColor)! > 0 ? 'text-emerald-500' : deltaOf(myColor)! < 0 ? 'text-rose-500' : 'text-muted'}`}>({fmtDelta(deltaOf(myColor)!)})</span>
+                </>
+              ) : (
+                <span className="text-muted">Unrated — the game ended before both players moved.</span>
+              )}
+            </div>
+          )}
           {game.draw_offer && active && game.draw_offer !== myColor && (
             <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-neon-purple/10 p-3 text-sm">
               <span className="font-semibold">🤝 {nameOf(oppColor)} offers a draw</span>

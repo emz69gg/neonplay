@@ -36,9 +36,22 @@ alter table public.scores drop constraint if exists scores_game_id_check;
 alter table public.scores add constraint scores_game_id_check check (game_id ~ '^[a-z0-9]{2,20}$');
 
 -- Newer Supabase projects don't expose new tables to the website automatically.
+-- chess ratings (only the server's chess functions may change these)
+alter table public.profiles add column if not exists chess_rating integer not null default 1200;
+alter table public.profiles add column if not exists chess_peak integer not null default 1200;
+alter table public.profiles add column if not exists chess_games integer not null default 0;
+alter table public.profiles add column if not exists chess_wins integer not null default 0;
+alter table public.profiles add column if not exists chess_losses integer not null default 0;
+alter table public.profiles add column if not exists chess_draws integer not null default 0;
+create index if not exists profiles_chess_rating_idx on public.profiles (chess_rating desc) where chess_games > 0;
+
 grant usage on schema public to anon, authenticated;
 grant select on public.profiles, public.scores to anon, authenticated;
-grant insert, update on public.profiles, public.scores to authenticated;
+grant insert, update on public.scores to authenticated;
+-- players may save their own progress, but not touch their chess rating columns
+revoke insert, update on public.profiles from authenticated;
+grant insert (id, username, avatar, xp, level, data, updated_at) on public.profiles to authenticated;
+grant update (id, username, avatar, xp, level, data, updated_at) on public.profiles to authenticated;
 
 alter table public.profiles enable row level security;
 alter table public.scores enable row level security;
@@ -164,6 +177,12 @@ create table if not exists public.chess_games (
 alter table public.chess_games add column if not exists seen_at timestamptz not null default now();
 alter table public.chess_games add column if not exists rematch_id uuid;
 alter table public.chess_games add column if not exists rematch_by text;
+alter table public.chess_games add column if not exists rated boolean not null default true;
+alter table public.chess_games add column if not exists rating_done boolean not null default false;
+alter table public.chess_games add column if not exists white_rating integer;
+alter table public.chess_games add column if not exists black_rating integer;
+alter table public.chess_games add column if not exists white_delta integer;
+alter table public.chess_games add column if not exists black_delta integer;
 create index if not exists chess_games_waiting_idx on public.chess_games (status, is_private, time_ms, created_at);
 create index if not exists chess_games_white_idx on public.chess_games (white);
 create index if not exists chess_games_black_idx on public.chess_games (black);
@@ -205,20 +224,28 @@ returns integer language sql stable as $$
   end
 $$;
 
-create or replace function public.chess_create(p_time_ms integer, p_private boolean, p_name text, p_avatar jsonb, p_color text)
+create or replace function public.chess_rating_of(uid uuid)
+returns integer language sql stable security definer set search_path = public as $$
+  select coalesce((select chess_rating from public.profiles where id = uid), 1200)
+$$;
+
+drop function if exists public.chess_create(integer, boolean, text, jsonb, text);
+create or replace function public.chess_create(p_time_ms integer, p_private boolean, p_name text, p_avatar jsonb, p_color text, p_rated boolean)
 returns public.chess_games language plpgsql security definer set search_path = public as $$
 declare
   uid uuid := auth.uid();
   g public.chess_games;
   as_white boolean := coalesce(p_color = 'w', random() < 0.5);
+  r integer := public.chess_rating_of(auth.uid());
 begin
   if uid is null then raise exception 'Log in to play online'; end if;
-  insert into public.chess_games (code, is_private, created_by, white, black, white_name, black_name, white_avatar, black_avatar, time_ms, white_ms, black_ms, seen_at)
+  insert into public.chess_games (code, is_private, rated, created_by, white, black, white_name, black_name, white_avatar, black_avatar, white_rating, black_rating, time_ms, white_ms, black_ms, seen_at)
   values (
-    upper(substr(md5(gen_random_uuid()::text), 1, 6)), coalesce(p_private, false), uid,
+    upper(substr(md5(gen_random_uuid()::text), 1, 6)), coalesce(p_private, false), coalesce(p_rated, true), uid,
     case when as_white then uid end, case when as_white then null else uid end,
     case when as_white then left(p_name, 16) end, case when as_white then null else left(p_name, 16) end,
     case when as_white then p_avatar end, case when as_white then null else p_avatar end,
+    case when as_white then r end, case when as_white then null else r end,
     p_time_ms, p_time_ms, p_time_ms, now())
   returning * into g;
   return g;
@@ -235,18 +262,55 @@ begin
     black_name = coalesce(black_name, case when black is null and white is not null then left(p_name, 16) end),
     white_avatar = coalesce(white_avatar, case when white is null then p_avatar end),
     black_avatar = coalesce(black_avatar, case when black is null and white is not null then p_avatar end),
+    white_rating = coalesce(white_rating, case when white is null then public.chess_rating_of(uid) end),
+    black_rating = coalesce(black_rating, case when black is null and white is not null then public.chess_rating_of(uid) end),
     status = 'active', last_move_at = now(), updated_at = now()
   where id = g.id
   returning * into r;
   return r;
 end $$;
 
+-- Ends a game and, for rated games, updates both players' Elo ratings (once).
 create or replace function public.chess_finish(p_id uuid, p_winner text, p_reason text)
 returns public.chess_games language plpgsql security definer set search_path = public as $$
-declare r public.chess_games;
+declare
+  r public.chess_games;
+  wr integer; br integer; wg integer; bg integer;
+  ew double precision; sw double precision;
+  kw integer; kb integer; dw integer; db integer;
 begin
   update public.chess_games set status = 'finished', winner = p_winner, result_reason = p_reason, draw_offer = null, updated_at = now()
    where id = p_id returning * into r;
+  -- games that never really started (fewer than 2 moves) don't count
+  if r.rated and not r.rating_done and r.white is not null and r.black is not null and jsonb_array_length(r.moves) >= 2 then
+    select chess_rating, chess_games into wr, wg from public.profiles where id = r.white for update;
+    select chess_rating, chess_games into br, bg from public.profiles where id = r.black for update;
+    wr := coalesce(wr, 1200); br := coalesce(br, 1200); wg := coalesce(wg, 0); bg := coalesce(bg, 0);
+    ew := 1.0 / (1.0 + power(10.0, (br - wr) / 400.0));
+    sw := case when p_winner = 'w' then 1.0 when p_winner = 'b' then 0.0 else 0.5 end;
+    kw := case when wg < 30 then 40 else 20 end;  -- new players' ratings move faster
+    kb := case when bg < 30 then 40 else 20 end;
+    dw := round(kw * (sw - ew));
+    db := round(kb * ((1 - sw) - (1 - ew)));
+    update public.profiles set
+      chess_rating = greatest(100, chess_rating + dw),
+      chess_peak = greatest(chess_peak, chess_rating + dw),
+      chess_games = chess_games + 1,
+      chess_wins = chess_wins + (case when sw = 1 then 1 else 0 end),
+      chess_losses = chess_losses + (case when sw = 0 then 1 else 0 end),
+      chess_draws = chess_draws + (case when sw = 0.5 then 1 else 0 end)
+    where id = r.white;
+    update public.profiles set
+      chess_rating = greatest(100, chess_rating + db),
+      chess_peak = greatest(chess_peak, chess_rating + db),
+      chess_games = chess_games + 1,
+      chess_wins = chess_wins + (case when sw = 0 then 1 else 0 end),
+      chess_losses = chess_losses + (case when sw = 1 then 1 else 0 end),
+      chess_draws = chess_draws + (case when sw = 0.5 then 1 else 0 end)
+    where id = r.black;
+    update public.chess_games set rating_done = true, white_delta = dw, black_delta = db, white_rating = coalesce(white_rating, wr), black_rating = coalesce(black_rating, br)
+     where id = p_id returning * into r;
+  end if;
   return r;
 end $$;
 
@@ -254,7 +318,8 @@ end $$;
 create or replace function public.chess_new_game(p_time_ms integer, p_private boolean, p_name text, p_avatar jsonb)
 returns public.chess_games language plpgsql security definer set search_path = public as $$
 begin
-  return public.chess_create(p_time_ms, p_private, p_name, p_avatar, null);
+  -- games against a friend are friendly (unrated); quick-match games are rated
+  return public.chess_create(p_time_ms, p_private, p_name, p_avatar, null, not coalesce(p_private, false));
 end $$;
 
 create or replace function public.chess_find_match(p_time_ms integer, p_name text, p_avatar jsonb)
@@ -265,10 +330,11 @@ declare
 begin
   if uid is null then raise exception 'Log in to play online'; end if;
   -- someone else waiting with the same time control, still on the page (heartbeat in the last 25 s)?
+  -- prefer the opponent whose rating is closest to yours
   select * into g from public.chess_games
    where status = 'waiting' and not is_private and time_ms = p_time_ms and created_by <> uid
      and seen_at > now() - interval '25 seconds'
-   order by created_at
+   order by abs(coalesce(white_rating, black_rating, 1200) - public.chess_rating_of(uid)), created_at
    limit 1
    for update skip locked;
   if found then
@@ -282,7 +348,7 @@ begin
     update public.chess_games set seen_at = now() where id = g.id returning * into g;
     return g;
   end if;
-  return public.chess_create(p_time_ms, false, p_name, p_avatar, null);
+  return public.chess_create(p_time_ms, false, p_name, p_avatar, null, true);
 end $$;
 
 -- the waiting player's page calls this every few seconds
@@ -442,13 +508,13 @@ begin
     if g.status <> 'waiting' then raise exception 'That rematch is no longer available'; end if;
     return public.chess_take_seat(g, uid, p_name, p_avatar);
   end if;
-  g := public.chess_create(old.time_ms, true, p_name, p_avatar, case when me = 'w' then 'b' else 'w' end);
+  g := public.chess_create(old.time_ms, true, p_name, p_avatar, case when me = 'w' then 'b' else 'w' end, old.rated);
   update public.chess_games set rematch_id = g.id, rematch_by = me, updated_at = now() where id = p_id;
   return g;
 end $$;
 
 -- Only signed-in players may call the game functions; internal helpers stay private.
-revoke all on function public.chess_create(integer, boolean, text, jsonb, text) from public, anon, authenticated;
+revoke all on function public.chess_create(integer, boolean, text, jsonb, text, boolean) from public, anon, authenticated;
 revoke all on function public.chess_take_seat(public.chess_games, uuid, text, jsonb) from public, anon, authenticated;
 revoke all on function public.chess_finish(uuid, text, text) from public, anon, authenticated;
 do $$

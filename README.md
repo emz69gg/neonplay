@@ -64,3 +64,12 @@ The workflow in `.github/workflows/deploy.yml` builds and publishes the site eve
 3. Optional: to turn on cloud accounts, add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` under **Settings → Secrets and variables → Actions**.
 
 The app uses relative asset paths and hash routing (`/#/game/snake`), so it works from any sub-path without extra configuration.
+
+### Chess ratings (Elo) and practice bots
+
+- Online **quick matches are rated**. Everyone starts at 1200. Ratings use standard Elo: K = 40 for your first 30 games, then 20. Games with fewer than 2 moves and invite-link games (friendly) don't change ratings; rematches keep the original game's rated/friendly setting.
+- Ratings are calculated **only on the server** (in `chess_finish`). Players can't edit their own rating columns.
+- Quick match pairs you with the waiting player closest to your rating.
+- Leaderboard → **♞ Chess Elo** lists rated players. Your rating also shows in the online lobby and on your profile.
+- **vs Bots** has 7 practice bots from 400 to 2100 Elo. The game recommends one near your rating, and ✓ marks bots you've beaten.
+- After pulling this update, **run `supabase/schema.sql` again** in the SQL editor (it's safe to re-run).
